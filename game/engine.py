@@ -158,6 +158,9 @@ class GameEngine:
 
     def _settle_move(self, move):
         if self._is_intercepted(move):
+            # The moving piece is captured mid-flight by the jumping piece,
+            # so it is removed from its source rather than surviving there.
+            self._board.set(*move.start, self._config.EMPTY_CELL)
             return
 
         r, c = move.end
@@ -169,13 +172,10 @@ class GameEngine:
         if self._win_condition.is_game_over(captured):
             self._game_over = True
 
-        # Promotion is disabled: a pawn reaching the last rank stays a pawn.
-        # To re-enable, restore the promote() call below and drop the line after it.
-        # piece = self._promotion_rule.promote(move.piece, r, self._board.height)
-        piece = move.piece
+        piece = self._promotion_rule.promote(move.piece, r, self._board.height)
         # The piece stays visible at its source while in flight; it leaves the
-        # source only now, on arrival. (If intercepted or blocked by the checks
-        # above, it never moves and survives at the source.)
+        # source only now, on arrival. (A same-color piece blocking the target
+        # returns above, so the mover survives in place in that case.)
         self._board.set(*move.start, self._config.EMPTY_CELL)
         self._board.set(r, c, piece)
 
