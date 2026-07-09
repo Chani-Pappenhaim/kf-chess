@@ -109,6 +109,13 @@ class GameEngine:
         if not self._is_legal_move(piece, start, cell):
             return  # illegal target: keep current selection
 
+        # Real-time policy: only one move may be in flight at a time, so a
+        # second move is rejected while any move is active and the piece that
+        # started first wins a contested route. Flip ALLOW_CONCURRENT_MOVES
+        # in config to lift this restriction.
+        if not self._config.ALLOW_CONCURRENT_MOVES and self._active_moves:
+            return
+
         self._active_moves.append(Move(piece, start, cell, self._arrival_clock(start, cell)))
         self._selected = None
 
