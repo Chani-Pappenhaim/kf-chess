@@ -42,6 +42,12 @@ def test_rook_clear_path():
     assert rook.is_legal(0, 3, context(board, "w", (4, 4), (4, 7)))
 
 
+def test_rook_rejects_diagonal():
+    board = empty_board()
+    rook = RookMovement()
+    assert not rook.is_legal(2, 2, context(board, "w", (4, 4), (6, 6)))
+
+
 def test_bishop_requires_diagonal():
     board = empty_board()
     bishop = BishopMovement()
