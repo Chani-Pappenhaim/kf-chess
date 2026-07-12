@@ -8,8 +8,8 @@ move.
 
 ```
 config/    settings.py            - all constants (timing, colors, pawn config)
-board/     board_interface.py     - abstract BoardRepresentation
-           text_board.py          - concrete text-token implementation
+board/     board.py               - Board, the single internal representation
+           loaders.py             - input-format adapters: text -> Board (add binary/FEN here)
 rules/     movement_strategy.py   - MovementStrategy interface + MoveContext
            piece_rules.py         - King/Queen/Rook/Bishop/Knight/Pawn strategies
            rule_registry.py       - PieceRuleRegistry (Registry/Factory pattern)
@@ -18,7 +18,7 @@ rules/     movement_strategy.py   - MovementStrategy interface + MoveContext
 realtime/  models.py              - Move / Jump in-flight motion objects
            real_time_arbiter.py   - RealTimeArbiter (clock, arrivals, interception) + ArrivalEvent
 game/      models.py              - MoveResult + Reason (engine command-boundary result)
-           parser.py              - input parsing + board construction
+           parser.py              - splits the command script into board/commands sections
            board_mapper.py        - BoardMapper (pixel -> cell)
            controller.py          - Controller (selection state + click/jump dispatch)
            engine.py              - GameEngine (application-service coordinator)
@@ -34,7 +34,8 @@ The engine is a thin coordinator; each real responsibility lives in its own
 layer, so each is testable in isolation and a new rule/feature extends one
 layer without touching the others:
 
-- **Model** (`board/`) - logical occupancy only.
+- **Model** (`board/`) - one internal `Board` (logical occupancy only); input
+  formats are converted into it by adapters in `board/loaders.py`.
 - **Movement rules** (`rules/piece_rules.py` + `rule_registry.py`) - legal
   destinations per piece kind (Strategy pattern).
 - **RuleEngine** (`rules/rule_engine.py`) - read-only validation of a requested
@@ -49,18 +50,21 @@ layer without touching the others:
 
 ## How the 4 requirements are addressed
 
-1. **Future binary representation** - all game logic talks only to the
-   `BoardRepresentation` interface (`board/board_interface.py`). The only
-   concrete implementation today, `TextBoardRepresentation`, stores tokens
-   like `"wK"`, but a future `BitboardRepresentation` could implement the
-   same interface using integers internally without any other file
-   changing.
+1. **Supporting other board formats** - game logic works with a single
+   internal `Board` (`board/board.py`). Support for a new *input* format is
+   added at the boundary, not by subclassing the board: a loader in
+   `board/loaders.py` converts the external format into a `Board`
+   (`load_text_board` does this for text today; a `load_binary_board` would
+   sit beside it). Adding a format means writing one loader and pointing
+   `main.py` at it - no rules/engine/arbiter/view file changes. The variation
+   lives where it actually is (input format), instead of forcing a storage
+   abstraction the game never needs.
 
 2. **No hardcoded rules** - each piece's movement is a `MovementStrategy`
    registered by letter in a `PieceRuleRegistry`
    (`rules/rule_registry.py`). Registering a new kind (e.g. a custom
    "Champion" piece) automatically makes it a legal board token too, since
-   `game/parser.py` derives valid tokens from the registry instead of a
+   `board/loaders.py` derives valid tokens from the registry instead of a
    fixed string. Win conditions and promotion are likewise pluggable
    strategies (`rules/game_conditions.py`).
 

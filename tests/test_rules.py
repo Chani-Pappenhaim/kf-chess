@@ -1,6 +1,6 @@
 import pytest
 
-from board.text_board import TextBoardRepresentation
+from board.board import Board
 from rules.movement_strategy import MoveContext
 from rules.piece_rules import (
     KingMovement, QueenMovement, RookMovement,
@@ -19,7 +19,7 @@ def context(board, color, start, end):
 
 
 def empty_board(width=8, height=8):
-    return TextBoardRepresentation([["."] * width for _ in range(height)])
+    return Board([["."] * width for _ in range(height)])
 
 
 def test_king_moves_one_square_any_direction():

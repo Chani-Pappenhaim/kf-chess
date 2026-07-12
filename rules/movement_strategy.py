@@ -11,7 +11,7 @@ class MoveContext:
     changing every call site.
     """
 
-    board: object  # BoardRepresentation
+    board: object  # Board
     color: str
     start: tuple
     end: tuple

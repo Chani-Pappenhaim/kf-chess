@@ -9,7 +9,8 @@ from rules.rule_registry import build_default_registry
 from rules.rule_engine import RuleEngine
 from rules.game_conditions import KingCaptureWinCondition, LastRankPromotion
 from realtime.real_time_arbiter import RealTimeArbiter
-from game.parser import parse_input, build_board, BoardParseError
+from game.parser import parse_input
+from board.loaders import load_text_board, BoardParseError
 from game.board_mapper import BoardMapper
 from game.engine import GameEngine
 from game.controller import Controller
@@ -25,7 +26,7 @@ def run(input_lines, config=settings):
     registry = build_default_registry(config)
 
     try:
-        board = build_board(board_lines, registry, config)
+        board = load_text_board(board_lines, registry, config)
     except BoardParseError as error:
         print("ERROR", error)
         return

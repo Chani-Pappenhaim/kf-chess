@@ -1,5 +1,5 @@
 from config import settings
-from board.text_board import TextBoardRepresentation
+from board.board import Board
 from rules.game_conditions import LastRankPromotion, PromotionRule
 from realtime.real_time_arbiter import RealTimeArbiter
 
@@ -10,7 +10,7 @@ class NoPromotion(PromotionRule):
 
 
 def make_arbiter(rows, promotion_rule=None):
-    board = TextBoardRepresentation(rows)
+    board = Board(rows)
     arbiter = RealTimeArbiter(
         board=board,
         promotion_rule=promotion_rule or NoPromotion(),

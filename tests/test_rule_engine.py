@@ -1,12 +1,12 @@
 from config import settings
-from board.text_board import TextBoardRepresentation
+from board.board import Board
 from rules.rule_registry import build_default_registry
 from rules.rule_engine import RuleEngine
 from game.models import Reason
 
 
 def make_engine(rows):
-    board = TextBoardRepresentation(rows)
+    board = Board(rows)
     registry = build_default_registry(settings)
     return RuleEngine(rule_registry=registry, config=settings), board
 

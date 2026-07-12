@@ -47,11 +47,11 @@ class Controller:
         self._engine.request_jump(cell)
 
     def _resolve_selection(self, result, cell):
-        if result.is_accepted or result.reason in (Reason.BUSY_SOURCE, Reason.EMPTY_SOURCE):
-            # Move started, or the source is no longer usable: drop selection.
+        # Clicking another of your own pieces re-selects it (unless that piece
+        # is busy). Every other second click clears the selection: the move
+        # started, or the target was not a legal destination (illegal, blocked
+        # by another motion, off-limits after game over, or an unusable source).
+        if result.reason == Reason.FRIENDLY_DESTINATION and self._engine.can_select(cell):
+            self._selected = cell
+        else:
             self._selected = None
-        elif result.reason == Reason.FRIENDLY_DESTINATION:
-            # Clicking another friendly piece re-selects it, unless it is busy.
-            if self._engine.can_select(cell):
-                self._selected = cell
-        # Illegal / motion-in-progress / game-over: keep the current selection.

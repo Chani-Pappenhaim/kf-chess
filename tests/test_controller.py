@@ -1,5 +1,5 @@
 from config import settings
-from board.text_board import TextBoardRepresentation
+from board.board import Board
 from rules.rule_registry import build_default_registry
 from rules.rule_engine import RuleEngine
 from rules.game_conditions import KingCaptureWinCondition, LastRankPromotion
@@ -10,7 +10,7 @@ from game.controller import Controller
 
 
 def make_controller(rows):
-    board = TextBoardRepresentation(rows)
+    board = Board(rows)
     registry = build_default_registry(settings)
     engine = GameEngine(
         board=board,
@@ -62,11 +62,13 @@ def test_second_click_starts_move_and_clears_selection():
     assert board.get(0, 0) == "wR"  # still at source until it arrives
 
 
-def test_illegal_second_click_keeps_selection():
+def test_illegal_second_click_clears_selection():
+    # Clicking an illegal destination cancels the selection (the target was
+    # not a legal move), leaving the piece in place.
     controller, engine, board = make_controller([["wN", ".", "."], [".", ".", "."], [".", ".", "."]])
     controller.click(*cell_to_pixel(0, 0))
     controller.click(*cell_to_pixel(0, 1))  # not a legal knight move
-    assert controller.selected == (0, 0)
+    assert controller.selected is None
     assert board.get(0, 0) == "wN"
 
 

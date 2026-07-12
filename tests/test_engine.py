@@ -1,5 +1,5 @@
 from config import settings
-from board.text_board import TextBoardRepresentation
+from board.board import Board
 from rules.rule_registry import build_default_registry
 from rules.rule_engine import RuleEngine
 from rules.game_conditions import (
@@ -28,7 +28,7 @@ class NoPromotion(PromotionRule):
 
 
 def make_engine(rows, win_condition=None, promotion_rule=None):
-    board = TextBoardRepresentation(rows)
+    board = Board(rows)
     registry = build_default_registry(settings)
     arbiter = RealTimeArbiter(
         board=board,
