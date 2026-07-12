@@ -73,9 +73,11 @@ class PawnMovement(MovementStrategy):
         self._directions = directions
 
     def _home_row(self, direction, board):
-        """The rank a pawn may double-step from: the far edge it faces away
-        from. Derived from board height, so any board size works."""
-        return 0 if direction > 0 else board.height - 1
+        """The rank a pawn may double-step from: one row in from the player's
+        back rank (as in standard chess - rank 2 for a color that moves up,
+        rank 7 for one that moves down). Derived from board height, so any
+        board size works."""
+        return 1 if direction > 0 else board.height - 2
 
     def is_legal(self, dr, dc, context):
         direction = self._directions[context.color]
