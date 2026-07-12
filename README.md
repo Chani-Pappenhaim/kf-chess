@@ -13,14 +13,39 @@ board/     board_interface.py     - abstract BoardRepresentation
 rules/     movement_strategy.py   - MovementStrategy interface + MoveContext
            piece_rules.py         - King/Queen/Rook/Bishop/Knight/Pawn strategies
            rule_registry.py       - PieceRuleRegistry (Registry/Factory pattern)
+           rule_engine.py         - RuleEngine (read-only move validation) + MoveValidation
            game_conditions.py     - WinCondition / PromotionRule strategies
-game/      models.py              - Move / Jump value objects
+realtime/  models.py              - Move / Jump in-flight motion objects
+           real_time_arbiter.py   - RealTimeArbiter (clock, arrivals, interception) + ArrivalEvent
+game/      models.py              - MoveResult + Reason (engine command-boundary result)
            parser.py              - input parsing + board construction
-           engine.py              - GameEngine (turn orchestration)
-           renderer.py            - board -> text rendering
+           board_mapper.py        - BoardMapper (pixel -> cell)
+           controller.py          - Controller (selection state + click/jump dispatch)
+           engine.py              - GameEngine (application-service coordinator)
+view/      snapshot.py            - GameSnapshot (read-only view model)
+           renderer.py            - snapshot -> text rendering
 tests/     test_*.py              - unit tests (pytest)
 main.py    entry point + dependency wiring
 ```
+
+## Layers and responsibilities
+
+The engine is a thin coordinator; each real responsibility lives in its own
+layer, so each is testable in isolation and a new rule/feature extends one
+layer without touching the others:
+
+- **Model** (`board/`) - logical occupancy only.
+- **Movement rules** (`rules/piece_rules.py` + `rule_registry.py`) - legal
+  destinations per piece kind (Strategy pattern).
+- **RuleEngine** (`rules/rule_engine.py`) - read-only validation of a requested
+  move, returning a stable `Reason` code.
+- **RealTimeArbiter** (`realtime/`) - all motion over simulated time: active
+  moves/jumps, arrival timing, capture and interception; reports `ArrivalEvent`s.
+- **GameEngine** (`game/engine.py`) - application-service coordinator and public
+  command boundary; owns the game-over guard and one-motion-at-a-time policy.
+- **Controller / BoardMapper** (`game/controller.py`, `game/board_mapper.py`) -
+  translate pixels to cells and own selection state.
+- **View** (`view/`) - renders a read-only `GameSnapshot`, never the live board.
 
 ## How the 4 requirements are addressed
 
