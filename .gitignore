@@ -19,8 +19,8 @@ ENV/
 .pytest_cache/
 .coverage
 .coverage.*
-htmlcov/
 .tox/
+# htmlcov/ is intentionally committed as a browsable coverage report
 
 # Type checkers / linters
 .mypy_cache/
