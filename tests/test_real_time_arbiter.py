@@ -70,7 +70,7 @@ def test_capture_reported_on_arrival():
 def test_promotion_applied_on_arrival():
     arbiter, board = make_arbiter(
         [[".", ".", "."], ["wP", ".", "."]],
-        promotion_rule=LastRankPromotion(),
+        promotion_rule=LastRankPromotion(settings.PAWN_DIRECTION),
     )
     arbiter.start_move("wP", (1, 0), (0, 0))
     events = arbiter.advance_time(settings.MOVE_DURATION)

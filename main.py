@@ -33,7 +33,7 @@ def run(input_lines, config=settings):
 
     arbiter = RealTimeArbiter(
         board=board,
-        promotion_rule=LastRankPromotion(),
+        promotion_rule=LastRankPromotion(config.PAWN_DIRECTION),
         config=config,
     )
     engine = GameEngine(

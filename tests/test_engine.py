@@ -32,7 +32,7 @@ def make_engine(rows, win_condition=None, promotion_rule=None):
     registry = build_default_registry(settings)
     arbiter = RealTimeArbiter(
         board=board,
-        promotion_rule=promotion_rule or LastRankPromotion(),
+        promotion_rule=promotion_rule or LastRankPromotion(settings.PAWN_DIRECTION),
         config=settings,
     )
     engine = GameEngine(

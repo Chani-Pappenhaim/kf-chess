@@ -15,7 +15,7 @@ def make_controller(rows):
     engine = GameEngine(
         board=board,
         rule_engine=RuleEngine(rule_registry=registry, config=settings),
-        arbiter=RealTimeArbiter(board=board, promotion_rule=LastRankPromotion(), config=settings),
+        arbiter=RealTimeArbiter(board=board, promotion_rule=LastRankPromotion(settings.PAWN_DIRECTION), config=settings),
         win_condition=KingCaptureWinCondition(),
         config=settings,
     )
