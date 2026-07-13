@@ -2,7 +2,7 @@ from config import settings
 from board.board import Board
 from rules.rule_registry import build_default_registry
 from rules.rule_engine import RuleEngine
-from game.models import Reason
+from rules.reasons import Reason
 
 
 def make_engine(rows):

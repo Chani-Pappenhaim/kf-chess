@@ -1,4 +1,5 @@
-from game.models import MoveResult, Reason
+from game.models import MoveResult
+from rules.reasons import Reason
 from view.snapshot import GameSnapshot
 
 

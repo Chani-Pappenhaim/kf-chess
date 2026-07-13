@@ -10,7 +10,7 @@ from rules.game_conditions import (
 )
 from realtime.real_time_arbiter import RealTimeArbiter
 from game.engine import GameEngine
-from game.models import Reason
+from rules.reasons import Reason
 from view.renderer import BoardRenderer
 
 

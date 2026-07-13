@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from game.models import Reason
+from rules.reasons import Reason
 from rules.movement_strategy import MoveContext
 
 

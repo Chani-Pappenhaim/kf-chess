@@ -1,4 +1,4 @@
-from game.models import Reason
+from rules.reasons import Reason
 
 
 class Controller:
