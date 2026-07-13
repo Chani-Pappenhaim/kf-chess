@@ -99,4 +99,4 @@ pytest
 
 ## Repository
 
-`<insert-git-repository-url-here>` (see header comment in `main.py`)
+https://github.com/Chani-Pappenhaim/kf-chess (see header comment in `main.py`)

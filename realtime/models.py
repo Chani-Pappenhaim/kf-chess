@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class Move:
     """A piece in flight between two cells.
 
@@ -15,7 +15,7 @@ class Move:
     arrival: int
 
 
-@dataclass
+@dataclass(frozen=True)
 class Jump:
     """A piece that is airborne on a cell until end_time.
 

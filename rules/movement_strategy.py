@@ -1,5 +1,11 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from board.board import Board
 
 
 @dataclass(frozen=True)
@@ -11,7 +17,7 @@ class MoveContext:
     changing every call site.
     """
 
-    board: object  # Board
+    board: Board
     color: str
     start: tuple
     end: tuple
