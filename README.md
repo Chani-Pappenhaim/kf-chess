@@ -82,13 +82,14 @@ layer without touching the others:
 
 ## Pawn double-step
 
-A pawn may take a two-square opening move only from its home rank. Rather
-than store that rank as a fixed constant, `PawnMovement` derives it from
-the board height: `0` for a color that moves downward and `height - 1` for
-one that moves upward. The same rule therefore holds on any board size -
-an 8x8 board (white's home rank is row 7) or a 4-row board (row 3) alike.
-Only the per-color advance direction stays configurable, in
-`config.PAWN_DIRECTION`.
+A pawn may take a two-square opening move only from its home rank - one row
+in front of its own back rank, matching standard chess (pawns start on the
+2nd rank, not the 1st). Rather than store that rank as a fixed constant,
+`PawnMovement` derives it from the board height: `1` for a color that moves
+downward and `height - 2` for one that moves upward. The same rule therefore
+holds on any board size - an 8x8 board (white's home rank is row 6) or a
+4-row board (row 2) alike. Only the per-color advance direction stays
+configurable, in `config.PAWN_DIRECTION`.
 
 ## Running tests
 
