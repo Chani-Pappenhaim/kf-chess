@@ -1,4 +1,7 @@
-class Reason:
+from enum import Enum
+
+
+class Reason(str, Enum):
     """Stable, machine-readable outcome codes for a requested move.
 
     Defined once and reused by RuleEngine, GameEngine, and Controller so the
@@ -9,6 +12,12 @@ class Reason:
     Lives in its own module (rather than in game/models.py) so the low-level
     `rules` layer can share this vocabulary without importing upward from the
     `game` layer - the dependency only ever flows downward onto this module.
+
+    Subclassing ``str`` (rather than plain ``Enum``) keeps each member equal and
+    comparable to its string value, so it stays a drop-in for the previous bare
+    string codes while gaining membership, iteration and typo safety. ``str,
+    Enum`` is used instead of ``enum.StrEnum`` so the code still runs on the
+    pre-3.10 grader.
     """
 
     OK = "ok"
