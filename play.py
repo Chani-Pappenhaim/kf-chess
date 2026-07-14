@@ -16,9 +16,12 @@ from rules.rule_registry import build_default_registry
 from rules.rule_engine import RuleEngine
 from rules.game_conditions import KingCaptureWinCondition, LastRankPromotion
 from game.engine import GameEngine
+from game.board_mapper import BoardMapper
+from game.controller import Controller
 from graphics.assets import AssetLoader, read_image
 from graphics.window import Window
 from ui.graphics_renderer import GraphicsRenderer
+from ui.input_source import InputTranslator
 
 
 def load_board_background(config=settings):
@@ -27,12 +30,9 @@ def load_board_background(config=settings):
     return read_image(config.BOARD_IMAGE, size=(config.BOARD_PX, config.BOARD_PX))
 
 
-def build_engine(config=settings):
-    """Compose the full GameEngine with the board loaded from board.csv.
-
-    Mirrors main.run's dependency graph; kept here so the graphical entry owns
-    its own composition root without disturbing the command-script one.
-    """
+def _compose(config):
+    """Build the engine and its board from board.csv (the graphical
+    composition root; mirrors main.run's dependency graph)."""
     registry = build_default_registry(config)
     with open(config.BOARD_CSV, encoding="utf-8") as handle:
         board = load_csv_board(handle.read().splitlines(), registry, config)
@@ -41,18 +41,33 @@ def build_engine(config=settings):
         promotion_rule=LastRankPromotion(config.PAWN_DIRECTION),
         config=config,
     )
-    return GameEngine(
+    engine = GameEngine(
         board=board,
         rule_engine=RuleEngine(rule_registry=registry, config=config),
         arbiter=arbiter,
         win_condition=KingCaptureWinCondition(),
         config=config,
     )
+    return engine, board
+
+
+def build_engine(config=settings):
+    """Compose the GameEngine alone (used where no input handling is needed)."""
+    engine, _ = _compose(config)
+    return engine
+
+
+def build_game(config=settings):
+    """Compose the engine plus a Controller wired to it, ready to drive input."""
+    engine, board = _compose(config)
+    controller = Controller(engine, BoardMapper(board, config.CELL_SIZE))
+    return engine, controller
 
 
 def run(config=settings):  # pragma: no cover - real-time GUI loop
     window = Window(config.WINDOW_TITLE)
-    engine = build_engine(config)
+    engine, controller = build_game(config)
+    translator = InputTranslator(controller)
     sprites = AssetLoader(config).load_sprite_library()
     renderer = GraphicsRenderer(sprites, config.CELL_SIZE)
     background = load_board_background(config)
@@ -65,8 +80,11 @@ def run(config=settings):  # pragma: no cover - real-time GUI loop
             previous = now
             canvas = renderer.render(engine.render_model(), background, clock_ms=engine.clock)
             window.show(canvas)
-            if any(event[0] == "quit" for event in window.poll_events()):
-                running = False
+            for event in window.poll_events():
+                if event[0] == "quit":
+                    running = False
+                else:
+                    translator.handle(event)
     finally:
         window.close()
 

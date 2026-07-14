@@ -1,5 +1,14 @@
 import play
 from config import settings
+from game.controller import Controller
+from game.engine import GameEngine
+
+
+def test_build_game_returns_engine_and_wired_controller():
+    engine, controller = play.build_game(settings)
+    assert isinstance(engine, GameEngine)
+    assert isinstance(controller, Controller)
+    assert controller.selected is None
 
 
 def test_load_board_background_matches_logical_size():

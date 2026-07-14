@@ -88,8 +88,9 @@ class GameEngine:
         """Rich read model for the graphical UI: every piece with its
         animation/domain state. This is the authoritative view a networked
         server would serialise; the client only draws it."""
+        motions = {motion.start: motion for motion in self._arbiter.active_motions()}
         pieces = tuple(
-            self._render_piece(self._board.get(r, c), (r, c))
+            self._render_piece(self._board.get(r, c), (r, c), motions)
             for r in range(self._board.height)
             for c in range(self._board.width)
             if not self._board.is_empty(r, c)
@@ -101,9 +102,21 @@ class GameEngine:
             game_over=self._game_over,
         )
 
-    def _render_piece(self, token, cell):
-        # A piece on the board is idle unless the arbiter reports it moving or
-        # resting; those states are layered on with the real-time animation work.
+    def _render_piece(self, token, cell, motions):
+        # An in-flight piece still sits on its source cell on the board; render
+        # it sliding towards its destination. A jumping piece stays put but plays
+        # its jump animation. Otherwise the piece is idle.
+        motion = motions.get(cell)
+        if motion is not None:
+            return RenderPiece(
+                token=token,
+                cell=motion.end,
+                state="move",
+                origin=cell,
+                progress=motion.progress,
+            )
+        if self._arbiter.is_jumping_on(cell):
+            return RenderPiece(token=token, cell=cell, state="jump")
         return RenderPiece(token=token, cell=cell)
 
     def render(self, renderer):
