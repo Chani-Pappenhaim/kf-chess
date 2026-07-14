@@ -7,6 +7,9 @@
 omit =
     tests/*
     conftest.py
+    # Vendored third-party graphics primitive (from KamaTechOrg/CTD26); not our
+    # code to unit-test. The window/loop GUI shells use `pragma: no cover`.
+    graphics/img.py
 
 [report]
 show_missing = True

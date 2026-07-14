@@ -29,3 +29,24 @@ EMPTY_CELL = "."
 # started first, so only one move is allowed at a time (default False).
 # Set True to re-enable concurrent moves.
 ALLOW_CONCURRENT_MOVES = False
+
+# Cooldown after a completed action (milliseconds). Matches the CTD26 rest
+# animations: a move settles into long_rest, a jump into short_rest. During
+# the cooldown the piece may not act (see RealTimeArbiter / Reason.RESTING).
+LONG_REST_DURATION = 833
+SHORT_REST_DURATION = 625
+
+# --- Graphical UI (assets, window, real-time loop) -------------------------
+# Only the graphics/ and ui/ layers read these; the command-script path
+# (main.run) never touches them, so the VPL grader is unaffected.
+import os
+
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ASSETS_ROOT = os.path.join(_PROJECT_ROOT, "assets")
+BOARD_IMAGE = os.path.join(ASSETS_ROOT, "board.png")
+PIECES_ROOT = os.path.join(ASSETS_ROOT, "pieces")
+BOARD_CSV = os.path.join(ASSETS_ROOT, "board.csv")
+
+WINDOW_TITLE = "KungFu Chess"
+FPS = 60
+BOARD_PX = 8 * CELL_SIZE  # board background is rendered at 8 cells * CELL_SIZE
