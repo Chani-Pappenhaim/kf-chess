@@ -26,3 +26,4 @@ class RenderModel:
     width: int
     height: int
     game_over: bool = False
+    clock: int = 0  # elapsed simulated time in ms (for the HUD)

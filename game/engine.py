@@ -106,6 +106,7 @@ class GameEngine:
             width=self._board.width,
             height=self._board.height,
             game_over=self._game_over,
+            clock=self._arbiter.clock,
         )
 
     def _render_piece(self, token, cell, motions):

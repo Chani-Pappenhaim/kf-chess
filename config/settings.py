@@ -50,3 +50,5 @@ BOARD_CSV = os.path.join(ASSETS_ROOT, "board.csv")
 WINDOW_TITLE = "KungFu Chess"
 FPS = 60
 BOARD_PX = 8 * CELL_SIZE  # board background is rendered at 8 cells * CELL_SIZE
+HUD_HEIGHT = 70           # strip below the board for score / time
+CANVAS_HEIGHT = BOARD_PX + HUD_HEIGHT

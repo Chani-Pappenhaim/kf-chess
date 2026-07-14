@@ -18,16 +18,26 @@ from rules.game_conditions import KingCaptureWinCondition, LastRankPromotion
 from game.engine import GameEngine
 from game.board_mapper import BoardMapper
 from game.controller import Controller
-from graphics.assets import AssetLoader, read_image
+from graphics.assets import AssetLoader, read_image, solid
 from graphics.window import Window
 from ui.graphics_renderer import GraphicsRenderer
+from ui.hud import Hud
 from ui.input_source import InputTranslator
+
+_STRIP_COLOR = (30, 30, 30, 255)  # dark HUD strip below the board
 
 
 def load_board_background(config=settings):
     """Load board.png resized to the logical board size (a fresh Img each call,
     so callers may draw pieces onto it without corrupting a shared canvas)."""
     return read_image(config.BOARD_IMAGE, size=(config.BOARD_PX, config.BOARD_PX))
+
+
+def new_base_canvas(config=settings):
+    """Full window canvas: the board at the top and a blank HUD strip below."""
+    canvas = solid(config.BOARD_PX, config.CANVAS_HEIGHT, _STRIP_COLOR)
+    load_board_background(config).draw_on(canvas, 0, 0)
+    return canvas
 
 
 def _compose(config):
@@ -70,7 +80,8 @@ def run(config=settings):  # pragma: no cover - real-time GUI loop
     translator = InputTranslator(controller)
     sprites = AssetLoader(config).load_sprite_library()
     renderer = GraphicsRenderer(sprites, config.CELL_SIZE)
-    background = load_board_background(config)
+    hud = Hud(config)
+    base = new_base_canvas(config)
     previous = time.perf_counter()
     try:
         running = True
@@ -78,7 +89,11 @@ def run(config=settings):  # pragma: no cover - real-time GUI loop
             now = time.perf_counter()
             engine.wait(int((now - previous) * 1000))
             previous = now
-            canvas = renderer.render(engine.render_model(), background, clock_ms=engine.clock)
+            model = engine.render_model()
+            canvas = renderer.render(
+                model, base, clock_ms=engine.clock, selected=controller.selected
+            )
+            hud.draw(canvas, model)
             window.show(canvas)
             for event in window.poll_events():
                 if event[0] == "quit":
