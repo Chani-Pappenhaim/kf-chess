@@ -40,6 +40,7 @@ class RealTimeArbiter:
         self._clock = 0
         self._active_moves = []
         self._active_jumps = []
+        self._cooldowns = {}  # cell -> (rest_state, expiry_clock)
 
     @property
     def clock(self):
@@ -53,6 +54,20 @@ class RealTimeArbiter:
 
     def is_jumping_on(self, cell):
         return any(jump.cell == cell for jump in self._active_jumps)
+
+    def cooldown_of(self, cell):
+        """The rest state a piece on `cell` is in ('short_rest' after a jump,
+        'long_rest' after a move), or None if it is free to act. Checks the
+        expiry against the current clock, so an elapsed cooldown reads as None
+        even before resolve() prunes it."""
+        entry = self._cooldowns.get(cell)
+        if entry is None:
+            return None
+        rest_state, expiry = entry
+        return None if self._clock >= expiry else rest_state
+
+    def is_resting(self, cell):
+        return self.cooldown_of(cell) is not None
 
     def active_motions(self):
         """Read-only views of the in-flight moves, each with its progress (0..1)
@@ -90,6 +105,7 @@ class RealTimeArbiter:
                 events.append(event)
         self._active_moves = remaining
         self._resolve_jumps()
+        self._prune_cooldowns()
         return events
 
     # -- internal helpers -------------------------------------------------
@@ -122,6 +138,9 @@ class RealTimeArbiter:
         # returns above, so the mover survives in place in that case.)
         self._board.set(*move.start, self._config.EMPTY_CELL)
         self._board.set(r, c, piece)
+        # A completed move settles into a long rest before the piece can act
+        # again (the state the move animation transitions into).
+        self._begin_cooldown((r, c), "long_rest", self._config.LONG_REST_DURATION)
         return ArrivalEvent(piece=piece, destination=(r, c), captured=captured)
 
     def _is_intercepted(self, move):
@@ -132,4 +151,21 @@ class RealTimeArbiter:
         )
 
     def _resolve_jumps(self):
-        self._active_jumps = [j for j in self._active_jumps if self._clock < j.end_time]
+        airborne = []
+        for jump in self._active_jumps:
+            if self._clock < jump.end_time:
+                airborne.append(jump)
+            else:
+                # A completed jump settles into a short rest on its cell.
+                self._begin_cooldown(jump.cell, "short_rest", self._config.SHORT_REST_DURATION)
+        self._active_jumps = airborne
+
+    def _begin_cooldown(self, cell, rest_state, duration):
+        self._cooldowns[cell] = (rest_state, self._clock + duration)
+
+    def _prune_cooldowns(self):
+        self._cooldowns = {
+            cell: entry
+            for cell, entry in self._cooldowns.items()
+            if self._clock < entry[1]
+        }

@@ -36,6 +36,38 @@ def test_active_motions_is_empty_when_nothing_moves():
     assert arbiter.active_motions() == []
 
 
+def test_completed_move_leaves_a_long_rest_cooldown():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    arbiter.start_move("wR", (0, 0), (0, 1))
+    arbiter.advance_time(settings.MOVE_DURATION)  # arrives at (0, 1)
+    assert arbiter.cooldown_of((0, 1)) == "long_rest"
+    assert arbiter.is_resting((0, 1))
+
+
+def test_jump_stays_airborne_before_its_duration():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    arbiter.start_jump("wR", (0, 0))
+    arbiter.advance_time(settings.JUMP_DURATION - 1)
+    assert arbiter.is_jumping_on((0, 0))
+    assert arbiter.cooldown_of((0, 0)) is None  # airborne, not resting yet
+
+
+def test_completed_jump_leaves_a_short_rest_cooldown():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    arbiter.start_jump("wR", (0, 0))
+    arbiter.advance_time(settings.JUMP_DURATION)  # jump ends on (0, 0)
+    assert arbiter.cooldown_of((0, 0)) == "short_rest"
+
+
+def test_cooldown_clears_after_its_duration():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    arbiter.start_move("wR", (0, 0), (0, 1))
+    arbiter.advance_time(settings.MOVE_DURATION)
+    arbiter.advance_time(settings.LONG_REST_DURATION)  # rest elapses
+    assert arbiter.cooldown_of((0, 1)) is None
+    assert not arbiter.is_resting((0, 1))
+
+
 def test_one_square_move_has_not_arrived_before_duration():
     arbiter, board = make_arbiter([["wR", ".", "."]])
     arbiter.start_move("wR", (0, 0), (0, 1))
