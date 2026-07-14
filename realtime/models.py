@@ -25,3 +25,16 @@ class Jump:
     piece: str
     cell: tuple
     end_time: int
+
+
+@dataclass(frozen=True)
+class MotionView:
+    """A read-only snapshot of a Move for the view layer: where it started, its
+    destination, and how far along it is (0..1) at the current clock. Lets the
+    renderer slide a piece without reaching into the arbiter's live Move list.
+    """
+
+    piece: str
+    start: tuple
+    end: tuple
+    progress: float

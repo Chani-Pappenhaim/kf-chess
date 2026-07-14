@@ -19,6 +19,23 @@ def make_arbiter(rows, promotion_rule=None):
     return arbiter, board
 
 
+def test_active_motions_report_progress_along_the_move():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    arbiter.start_move("wR", (0, 0), (0, 2))  # 2 squares
+    arbiter.advance_time(settings.MOVE_DURATION)  # halfway (of 2 * duration)
+
+    motions = arbiter.active_motions()
+    assert len(motions) == 1
+    motion = motions[0]
+    assert (motion.piece, motion.start, motion.end) == ("wR", (0, 0), (0, 2))
+    assert motion.progress == 0.5
+
+
+def test_active_motions_is_empty_when_nothing_moves():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    assert arbiter.active_motions() == []
+
+
 def test_one_square_move_has_not_arrived_before_duration():
     arbiter, board = make_arbiter([["wR", ".", "."]])
     arbiter.start_move("wR", (0, 0), (0, 1))

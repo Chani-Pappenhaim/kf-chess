@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from realtime.models import Move, Jump
+from realtime.models import Move, Jump, MotionView
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,17 @@ class RealTimeArbiter:
     def is_jumping_on(self, cell):
         return any(jump.cell == cell for jump in self._active_jumps)
 
+    def active_motions(self):
+        """Read-only views of the in-flight moves, each with its progress (0..1)
+        at the current clock - for the renderer to interpolate a sliding piece."""
+        return [self._motion_view(move) for move in self._active_moves]
+
+    def _motion_view(self, move):
+        total = self._move_total(move.start, move.end)
+        travelled = total - (move.arrival - self._clock)
+        progress = 1.0 if total <= 0 else max(0.0, min(1.0, travelled / total))
+        return MotionView(move.piece, move.start, move.end, progress)
+
     def start_move(self, piece, start, end):
         self._active_moves.append(Move(piece, start, end, self._arrival_clock(start, end)))
 
@@ -84,10 +95,13 @@ class RealTimeArbiter:
     # -- internal helpers -------------------------------------------------
 
     def _arrival_clock(self, start, end):
-        """A move takes MOVE_DURATION per square travelled; distance is the
-        number of squares on a straight/diagonal path (Chebyshev metric)."""
+        return self._clock + self._move_total(start, end)
+
+    def _move_total(self, start, end):
+        """Total travel time of a move: MOVE_DURATION per square, where distance
+        is the number of squares on a straight/diagonal path (Chebyshev metric)."""
         distance = max(abs(end[0] - start[0]), abs(end[1] - start[1]))
-        return self._clock + distance * self._config.MOVE_DURATION
+        return distance * self._config.MOVE_DURATION
 
     def _settle_move(self, move):
         if self._is_intercepted(move):
