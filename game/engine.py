@@ -43,7 +43,11 @@ class GameEngine:
         self._apply_events(self._arbiter.resolve())
         if self._game_over:
             return False
-        return not self.is_busy(cell) and not self._board.is_empty(*cell)
+        return (
+            not self.is_busy(cell)
+            and not self._arbiter.is_resting(cell)
+            and not self._board.is_empty(*cell)
+        )
 
     def request_move(self, start, end):
         self._apply_events(self._arbiter.resolve())
@@ -51,6 +55,8 @@ class GameEngine:
             return MoveResult(False, Reason.GAME_OVER)
         if self.is_busy(start):
             return MoveResult(False, Reason.BUSY_SOURCE)
+        if self._arbiter.is_resting(start):
+            return MoveResult(False, Reason.RESTING)
 
         validation = self._rule_engine.validate_move(self._board, start, end)
         if not validation.is_valid:
@@ -117,6 +123,9 @@ class GameEngine:
             )
         if self._arbiter.is_jumping_on(cell):
             return RenderPiece(token=token, cell=cell, state="jump")
+        rest_state = self._arbiter.cooldown_of(cell)
+        if rest_state is not None:
+            return RenderPiece(token=token, cell=cell, state=rest_state)
         return RenderPiece(token=token, cell=cell)
 
     def render(self, renderer):

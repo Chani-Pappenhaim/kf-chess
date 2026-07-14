@@ -164,6 +164,39 @@ def test_render_returns_current_board_text():
     assert text == "wK .\n. bK"
 
 
+def test_move_from_a_resting_piece_is_rejected():
+    engine, _ = make_engine([["wR", ".", "."]])
+    engine.request_move((0, 0), (0, 1))
+    engine.wait(settings.MOVE_DURATION)  # arrives at (0, 1), now resting
+    result = engine.request_move((0, 1), (0, 2))
+    assert not result.is_accepted
+    assert result.reason == Reason.RESTING
+
+
+def test_resting_piece_cannot_be_selected():
+    engine, _ = make_engine([["wR", ".", "."]])
+    engine.request_move((0, 0), (0, 1))
+    engine.wait(settings.MOVE_DURATION)
+    assert engine.can_select((0, 1)) is False
+
+
+def test_cooldown_expires_and_the_piece_can_move_again():
+    engine, _ = make_engine([["wR", ".", "."]])
+    engine.request_move((0, 0), (0, 1))
+    engine.wait(settings.MOVE_DURATION)
+    engine.wait(settings.LONG_REST_DURATION)  # rest elapses
+    assert engine.request_move((0, 1), (0, 2)).is_accepted
+
+
+def test_render_model_marks_a_resting_piece():
+    engine, _ = make_engine([["wR", ".", "."]])
+    engine.request_move((0, 0), (0, 1))
+    engine.wait(settings.MOVE_DURATION)
+    resting = [p for p in engine.render_model().pieces if p.cell == (0, 1)]
+    assert len(resting) == 1
+    assert resting[0].state == "long_rest"
+
+
 def test_clock_reflects_arbiter_time():
     engine, board = make_engine([["wR", ".", "."]])
     assert engine.clock == 0
