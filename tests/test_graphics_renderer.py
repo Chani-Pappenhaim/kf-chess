@@ -53,6 +53,18 @@ def test_moving_piece_is_interpolated_between_cells():
     assert _render(100, 100, piece) == [(100, 0)]
 
 
+def test_resting_piece_is_veiled_red():
+    cell = 100
+    renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)
+    piece = RenderPiece("wP", (1, 2), state="long_rest")
+    model = RenderModel(pieces=(piece,), width=8, height=8)
+    canvas = renderer.render(model, _FakeBackground(8 * cell))
+    # cell (1, 2): the red veil raises the red channel (BGRA index 2) there,
+    # and leaves the blue channel (index 0) untouched.
+    assert canvas.img[150, 250][2] > 0
+    assert canvas.img[150, 250][0] == 0
+
+
 def test_selection_highlight_tints_the_selected_cell():
     cell = 100
     renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)

@@ -11,7 +11,9 @@ from __future__ import annotations
 from graphics.assets import solid
 from graphics.img import Img
 
-_HIGHLIGHT_COLOR = (0, 255, 0, 90)  # translucent green (BGRA)
+_HIGHLIGHT_COLOR = (0, 255, 0, 90)   # translucent green (BGRA) - selection
+_RESTING_COLOR = (0, 0, 255, 110)    # translucent red (BGRA) - cooldown
+_RESTING_STATES = ("short_rest", "long_rest")
 
 
 class GraphicsRenderer:
@@ -19,10 +21,12 @@ class GraphicsRenderer:
         self._sprites = sprite_library
         self._cell = cell_size
         self._highlight = solid(cell_size, cell_size, _HIGHLIGHT_COLOR)
+        self._resting = solid(cell_size, cell_size, _RESTING_COLOR)
 
     def render(self, model, background, clock_ms=0, selected=None):
         """Draw the model over a copy of `background`, returning a new canvas.
-        The selected cell (if any) is highlighted under the pieces."""
+        The selected cell is highlighted under the pieces; a piece in its rest
+        cooldown gets a red veil over it so it reads as unavailable."""
         canvas = Img()
         canvas.img = background.img.copy()
         if selected is not None:
@@ -33,6 +37,9 @@ class GraphicsRenderer:
             frame = animation.frame_at(clock_ms)
             x, y = self._top_left(piece, frame)
             frame.draw_on(canvas, x, y)
+            if piece.state in _RESTING_STATES:
+                row, col = piece.cell
+                self._resting.draw_on(canvas, col * self._cell, row * self._cell)
         return canvas
 
     def _top_left(self, piece, frame):
