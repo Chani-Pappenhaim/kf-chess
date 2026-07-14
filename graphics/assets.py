@@ -45,6 +45,17 @@ def read_image(path, size=None, keep_aspect=False, interpolation=cv2.INTER_AREA)
     return img
 
 
+def solid(width, height, color):
+    """A filled BGRA Img of a single (possibly translucent) colour - used for
+    overlays like the selection highlight and the game-over banner, so they can
+    be composited through Img.draw_on like any other image."""
+    array = np.zeros((height, width, 4), dtype=np.uint8)
+    array[:, :] = color
+    img = Img()
+    img.img = array
+    return img
+
+
 def _white_to_alpha(array, threshold=250):
     """Add an alpha channel to a 3-channel sprite, making near-white pixels
     transparent. The placeholder sprites ship on an opaque white background with

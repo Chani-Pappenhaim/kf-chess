@@ -8,18 +8,26 @@ slides between cells. All drawing goes through Img.draw_on.
 """
 from __future__ import annotations
 
+from graphics.assets import solid
 from graphics.img import Img
+
+_HIGHLIGHT_COLOR = (0, 255, 0, 90)  # translucent green (BGRA)
 
 
 class GraphicsRenderer:
     def __init__(self, sprite_library, cell_size):
         self._sprites = sprite_library
         self._cell = cell_size
+        self._highlight = solid(cell_size, cell_size, _HIGHLIGHT_COLOR)
 
-    def render(self, model, background, clock_ms=0):
-        """Draw the model over a copy of `background`, returning a new canvas."""
+    def render(self, model, background, clock_ms=0, selected=None):
+        """Draw the model over a copy of `background`, returning a new canvas.
+        The selected cell (if any) is highlighted under the pieces."""
         canvas = Img()
         canvas.img = background.img.copy()
+        if selected is not None:
+            row, col = selected
+            self._highlight.draw_on(canvas, col * self._cell, row * self._cell)
         for piece in model.pieces:
             animation = self._sprites.animation(piece.token, piece.state)
             frame = animation.frame_at(clock_ms)

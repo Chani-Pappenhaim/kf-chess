@@ -51,3 +51,14 @@ def test_moving_piece_is_interpolated_between_cells():
     # halfway from col 0 to col 2 -> col 1.0; full-cell sprite -> x = 100, y = 0.
     piece = RenderPiece("wP", (0, 2), state="move", origin=(0, 0), progress=0.5)
     assert _render(100, 100, piece) == [(100, 0)]
+
+
+def test_selection_highlight_tints_the_selected_cell():
+    cell = 100
+    renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)
+    model = RenderModel(pieces=(), width=8, height=8)
+    canvas = renderer.render(model, _FakeBackground(8 * cell), selected=(1, 2))
+    # cell (1, 2): top-left pixel (x=200, y=100); the highlight raises green there.
+    assert canvas.img[105, 205][1] > 0
+    # a cell that was not selected stays untouched.
+    assert canvas.img[5, 5][1] == 0
