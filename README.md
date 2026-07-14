@@ -9,7 +9,7 @@ move.
 ```
 config/    settings.py            - all constants (timing, colors, pawn config)
 board/     board.py               - Board, the single internal representation
-           loaders.py             - input-format adapters: text -> Board (add binary/FEN here)
+           loaders.py             - input-format adapters: text / CSV -> Board
 rules/     movement_strategy.py   - MovementStrategy interface + MoveContext
            piece_rules.py         - King/Queen/Rook/Bishop/Knight/Pawn strategies
            rule_registry.py       - PieceRuleRegistry (Registry/Factory pattern)
@@ -22,11 +22,26 @@ game/      models.py              - MoveResult + Reason (engine command-boundary
            board_mapper.py        - BoardMapper (pixel -> cell)
            controller.py          - Controller (selection state + click/jump dispatch)
            engine.py              - GameEngine (application-service coordinator)
-view/      snapshot.py            - GameSnapshot (read-only view model)
+view/      snapshot.py            - GameSnapshot (read-only text view model)
+           render_model.py        - RenderModel (rich read model for the graphical UI)
            renderer.py            - snapshot -> text rendering
+graphics/  img.py, window.py      - cv2 adapters (Img = drawing primitive; Window = window + input)
+           assets.py, sprite*.py  - Unicode-safe loading, AssetLoader, SpriteAnimation/Library
+ui/        graphics_renderer.py   - RenderModel -> canvas via Img (+ selection highlight)
+           hud.py                 - score / clock / game-over overlays
+           input_source.py        - InputTranslator (device event -> Controller)
+gateway/   gateway.py             - GameGateway Protocol + NetworkGateway stub (networked future)
 tests/     test_*.py              - unit tests (pytest)
-main.py    entry point + dependency wiring
+main.py    text command-script entry (VPL / grader)
+play.py    graphical real-time entry: `python play.py`
 ```
+
+## Running
+
+- **Command script (text / VPL):** `python main.py < script.txt`
+- **Graphical real-time game:** `pip install -r requirements.txt` then
+  `python play.py`. Left-click a piece then a target to move, right-click to
+  jump, ESC/q to quit. See [docs/UI_ARCHITECTURE.md](docs/UI_ARCHITECTURE.md).
 
 ## Layers and responsibilities
 
