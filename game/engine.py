@@ -1,6 +1,7 @@
 from game.models import MoveResult
 from rules.reasons import Reason
 from view.snapshot import GameSnapshot
+from view.render_model import RenderModel, RenderPiece
 
 
 class GameEngine:
@@ -82,6 +83,28 @@ class GameEngine:
 
     def snapshot(self):
         return GameSnapshot.from_board(self._board, self._game_over)
+
+    def render_model(self):
+        """Rich read model for the graphical UI: every piece with its
+        animation/domain state. This is the authoritative view a networked
+        server would serialise; the client only draws it."""
+        pieces = tuple(
+            self._render_piece(self._board.get(r, c), (r, c))
+            for r in range(self._board.height)
+            for c in range(self._board.width)
+            if not self._board.is_empty(r, c)
+        )
+        return RenderModel(
+            pieces=pieces,
+            width=self._board.width,
+            height=self._board.height,
+            game_over=self._game_over,
+        )
+
+    def _render_piece(self, token, cell):
+        # A piece on the board is idle unless the arbiter reports it moving or
+        # resting; those states are layered on with the real-time animation work.
+        return RenderPiece(token=token, cell=cell)
 
     def render(self, renderer):
         self._apply_events(self._arbiter.resolve())
