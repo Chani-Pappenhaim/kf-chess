@@ -38,3 +38,15 @@ def test_render_model_marks_a_jumping_piece():
     jumper = [piece for piece in engine.render_model().pieces if piece.cell == (6, 0)]
     assert len(jumper) == 1
     assert jumper[0].state == "jump"
+
+
+def test_render_model_reports_cooldown_progress_for_a_resting_piece():
+    engine = play.build_engine(settings)
+    engine.request_move((6, 0), (5, 0))       # a one-step pawn move
+    engine.wait(settings.MOVE_DURATION)        # arrives at (5, 0), long rest begins
+    engine.wait(settings.LONG_REST_DURATION // 2)  # about halfway through the rest
+    resting = [piece for piece in engine.render_model().pieces if piece.cell == (5, 0)]
+    assert len(resting) == 1
+    piece = resting[0]
+    assert piece.state == "long_rest"
+    assert 0 < piece.cooldown_progress < 1

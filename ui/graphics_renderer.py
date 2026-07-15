@@ -21,12 +21,13 @@ class GraphicsRenderer:
         self._sprites = sprite_library
         self._cell = cell_size
         self._highlight = solid(cell_size, cell_size, _HIGHLIGHT_COLOR)
-        self._resting = solid(cell_size, cell_size, _RESTING_COLOR)
 
     def render(self, model, background, clock_ms=0, selected=None):
         """Draw the model over a copy of `background`, returning a new canvas.
         The selected cell is highlighted under the pieces; a piece in its rest
-        cooldown gets a red veil over it so it reads as unavailable."""
+        cooldown gets a red veil that drains from the top down as the cooldown
+        elapses, so the piece reads as unavailable and the shrinking veil shows
+        how much rest is left."""
         canvas = Img()
         canvas.img = background.img.copy()
         if selected is not None:
@@ -38,9 +39,22 @@ class GraphicsRenderer:
             x, y = self._top_left(piece, frame)
             frame.draw_on(canvas, x, y)
             if piece.state in _RESTING_STATES:
-                row, col = piece.cell
-                self._resting.draw_on(canvas, col * self._cell, row * self._cell)
+                self._draw_rest_veil(canvas, piece)
         return canvas
+
+    def _draw_rest_veil(self, canvas, piece):
+        """Draw the red cooldown veil over a resting piece. It covers the whole
+        cell when the rest begins and recedes downward as `cooldown_progress`
+        rises, clearing from the top so the veil's lower edge stays pinned to
+        the cell while its height shrinks to nothing when the cooldown ends."""
+        remaining = 1.0 - piece.cooldown_progress
+        height = int(round(remaining * self._cell))
+        if height <= 0:
+            return
+        row, col = piece.cell
+        top = row * self._cell + (self._cell - height)
+        veil = solid(self._cell, height, _RESTING_COLOR)
+        veil.draw_on(canvas, col * self._cell, top)
 
     def _top_left(self, piece, frame):
         row, col = self._current_cell(piece)

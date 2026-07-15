@@ -65,6 +65,27 @@ def test_resting_piece_is_veiled_red():
     assert canvas.img[150, 250][0] == 0
 
 
+def test_rest_veil_drains_from_the_top_as_the_cooldown_elapses():
+    cell = 100
+    renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)
+    # Half-elapsed cooldown on cell (0, 0): the veil should cover only the
+    # bottom half of the cell (y >= 50), leaving the top half cleared.
+    piece = RenderPiece("wP", (0, 0), state="long_rest", cooldown_progress=0.5)
+    model = RenderModel(pieces=(piece,), width=8, height=8)
+    canvas = renderer.render(model, _FakeBackground(8 * cell))
+    assert canvas.img[25, 25][2] == 0   # top half cleared (no red)
+    assert canvas.img[75, 25][2] > 0    # bottom half still veiled (red)
+
+
+def test_rest_veil_is_gone_once_the_cooldown_completes():
+    cell = 100
+    renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)
+    piece = RenderPiece("wP", (0, 0), state="long_rest", cooldown_progress=1.0)
+    model = RenderModel(pieces=(piece,), width=8, height=8)
+    canvas = renderer.render(model, _FakeBackground(8 * cell))
+    assert canvas.img[75, 25][2] == 0   # nothing left to veil
+
+
 def test_selection_highlight_tints_the_selected_cell():
     cell = 100
     renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)

@@ -18,6 +18,7 @@ class RenderPiece:
     state: str = "idle"  # idle / move / jump / short_rest / long_rest
     origin: tuple | None = None  # source cell while a move is in flight
     progress: float = 0.0        # 0..1 along origin -> cell (0 when still)
+    cooldown_progress: float = 0.0  # 0..1 elapsed while resting (drains the veil)
 
 
 @dataclass(frozen=True)
