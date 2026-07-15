@@ -68,6 +68,25 @@ def test_cooldown_clears_after_its_duration():
     assert not arbiter.is_resting((0, 1))
 
 
+def test_cooldown_progress_rises_from_zero_to_one_across_the_rest():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    arbiter.start_move("wR", (0, 0), (0, 1))
+    arbiter.advance_time(settings.MOVE_DURATION)  # arrives, long rest begins
+    assert arbiter.cooldown_progress((0, 1)) == 0.0
+
+    arbiter.advance_time(settings.LONG_REST_DURATION // 2)  # about halfway
+    halfway = arbiter.cooldown_progress((0, 1))
+    assert 0.4 < halfway < 0.6
+
+    arbiter.advance_time(settings.LONG_REST_DURATION)  # well past the end
+    assert arbiter.cooldown_progress((0, 1)) is None
+
+
+def test_cooldown_progress_is_none_when_not_resting():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    assert arbiter.cooldown_progress((0, 0)) is None
+
+
 def test_one_square_move_has_not_arrived_before_duration():
     arbiter, board = make_arbiter([["wR", ".", "."]])
     arbiter.start_move("wR", (0, 0), (0, 1))

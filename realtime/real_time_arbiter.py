@@ -40,7 +40,7 @@ class RealTimeArbiter:
         self._clock = 0
         self._active_moves = []
         self._active_jumps = []
-        self._cooldowns = {}  # cell -> (rest_state, expiry_clock)
+        self._cooldowns = {}  # cell -> (rest_state, start_clock, expiry_clock)
 
     @property
     def clock(self):
@@ -63,8 +63,23 @@ class RealTimeArbiter:
         entry = self._cooldowns.get(cell)
         if entry is None:
             return None
-        rest_state, expiry = entry
+        rest_state, _start, expiry = entry
         return None if self._clock >= expiry else rest_state
+
+    def cooldown_progress(self, cell):
+        """How far a resting piece is through its cooldown: 0.0 the instant the
+        rest begins, rising to 1.0 as it ends (None once free to act again).
+        Lets the view drain the rest veil from the top down as time elapses."""
+        entry = self._cooldowns.get(cell)
+        if entry is None:
+            return None
+        _rest_state, start, expiry = entry
+        if self._clock >= expiry:
+            return None
+        total = expiry - start
+        if total <= 0:
+            return 1.0
+        return max(0.0, min(1.0, (self._clock - start) / total))
 
     def is_resting(self, cell):
         return self.cooldown_of(cell) is not None
@@ -161,11 +176,11 @@ class RealTimeArbiter:
         self._active_jumps = airborne
 
     def _begin_cooldown(self, cell, rest_state, duration):
-        self._cooldowns[cell] = (rest_state, self._clock + duration)
+        self._cooldowns[cell] = (rest_state, self._clock, self._clock + duration)
 
     def _prune_cooldowns(self):
         self._cooldowns = {
             cell: entry
             for cell, entry in self._cooldowns.items()
-            if self._clock < entry[1]
+            if self._clock < entry[2]  # entry[2] is the expiry clock
         }

@@ -126,7 +126,12 @@ class GameEngine:
             return RenderPiece(token=token, cell=cell, state="jump")
         rest_state = self._arbiter.cooldown_of(cell)
         if rest_state is not None:
-            return RenderPiece(token=token, cell=cell, state=rest_state)
+            return RenderPiece(
+                token=token,
+                cell=cell,
+                state=rest_state,
+                cooldown_progress=self._arbiter.cooldown_progress(cell) or 0.0,
+            )
         return RenderPiece(token=token, cell=cell)
 
     def render(self, renderer):
