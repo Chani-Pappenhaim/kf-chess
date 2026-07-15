@@ -27,20 +27,37 @@ class NoPromotion(PromotionRule):
         return piece
 
 
-def make_engine(rows, win_condition=None, promotion_rule=None):
+class _ConfigOverride:
+    """Read-only view over the settings module with a few attributes replaced,
+    so a test can flip a single policy (e.g. ALLOW_CONCURRENT_MOVES) without
+    mutating the shared module. Any attribute not overridden falls through to
+    the real settings."""
+
+    def __init__(self, base, **overrides):
+        self._base = base
+        self._overrides = overrides
+
+    def __getattr__(self, name):
+        overrides = object.__getattribute__(self, "_overrides")
+        if name in overrides:
+            return overrides[name]
+        return getattr(object.__getattribute__(self, "_base"), name)
+
+
+def make_engine(rows, win_condition=None, promotion_rule=None, config=settings):
     board = Board(rows)
-    registry = build_default_registry(settings)
+    registry = build_default_registry(config)
     arbiter = RealTimeArbiter(
         board=board,
-        promotion_rule=promotion_rule or LastRankPromotion(settings.PAWN_DIRECTION),
-        config=settings,
+        promotion_rule=promotion_rule or LastRankPromotion(config.PAWN_DIRECTION),
+        config=config,
     )
     engine = GameEngine(
         board=board,
-        rule_engine=RuleEngine(rule_registry=registry, config=settings),
+        rule_engine=RuleEngine(rule_registry=registry, config=config),
         arbiter=arbiter,
         win_condition=win_condition or KingCaptureWinCondition(),
-        config=settings,
+        config=config,
     )
     return engine, board
 
@@ -80,14 +97,59 @@ def test_friendly_destination_is_rejected():
     assert result.reason == Reason.FRIENDLY_DESTINATION
 
 
-def test_second_move_while_one_is_active_is_rejected():
+def test_second_move_while_one_is_active_is_rejected_in_strict_mode():
+    strict = _ConfigOverride(settings, ALLOW_CONCURRENT_MOVES=False)
     rows = [["wR", ".", "."], [".", ".", "."], ["bR", ".", "."]]
-    engine, board = make_engine(rows)
+    engine, board = make_engine(rows, config=strict)
     engine.request_move((0, 0), (0, 2))
     result = engine.request_move((2, 0), (2, 2))
 
     assert not result.is_accepted
     assert result.reason == Reason.MOTION_IN_PROGRESS
+
+
+def test_both_players_can_have_moves_in_flight_at_once():
+    # Real-time default: white and black may move simultaneously, so a second
+    # move by the other player is accepted while the first is still travelling.
+    rows = [["wR", ".", "."], [".", ".", "."], ["bR", ".", "."]]
+    engine, board = make_engine(rows)
+    engine.request_move((0, 0), (0, 2))
+    result = engine.request_move((2, 0), (2, 2))
+
+    assert result.is_accepted
+    assert result.reason == Reason.OK
+
+    engine.wait(2 * settings.MOVE_DURATION)
+    assert board.get(0, 2) == "wR"
+    assert board.get(2, 2) == "bR"
+
+
+def test_same_player_can_start_another_move_while_one_is_in_flight():
+    # A single player may move a second (different) piece before the first
+    # arrives; only the piece already moving is "busy", the rest are free.
+    rows = [["wR", ".", ".", "."], ["wN", ".", ".", "."], [".", ".", ".", "."]]
+    engine, board = make_engine(rows)
+    first = engine.request_move((0, 0), (0, 2))
+    second = engine.request_move((1, 0), (2, 2))  # knight, a different piece
+
+    assert first.is_accepted
+    assert second.is_accepted
+
+    engine.wait(2 * settings.MOVE_DURATION)
+    assert board.get(0, 2) == "wR"
+    assert board.get(2, 2) == "wN"
+
+
+def test_a_busy_piece_cannot_start_a_second_move_even_when_concurrent():
+    # Concurrency is per-piece: the same piece may not be launched twice while
+    # its first move is still in flight.
+    rows = [["wR", ".", "."], [".", ".", "."], [".", ".", "."]]
+    engine, board = make_engine(rows)
+    engine.request_move((0, 0), (0, 2))
+    result = engine.request_move((0, 0), (2, 0))
+
+    assert not result.is_accepted
+    assert result.reason == Reason.BUSY_SOURCE
 
 
 def test_king_capture_ends_the_game():

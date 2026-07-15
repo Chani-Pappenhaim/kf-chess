@@ -25,10 +25,15 @@ PAWN_DIRECTION = {"w": -1, "b": 1}
 EMPTY_CELL = "."
 
 # Gameplay policy: may several moves be in flight at the same time?
-# The real-time variant resolves a contested route in favour of whoever
-# started first, so only one move is allowed at a time (default False).
-# Set True to re-enable concurrent moves.
-ALLOW_CONCURRENT_MOVES = False
+# True is the real-time KungFu Chess default: there are no turns, so both
+# players move at once and a single player may start further moves while an
+# earlier one is still travelling. What limits a player is per-piece, not
+# global - a piece that is already moving is "busy", and a piece that just
+# finished is "resting" (cooldown) - so each piece is gated on its own while
+# the board as a whole stays live. Set False to fall back to the strict
+# one-move-at-a-time variant, which resolves a contested route in favour of
+# whoever started first.
+ALLOW_CONCURRENT_MOVES = True
 
 # Cooldown after a completed action (milliseconds). Matches the CTD26 rest
 # animations: a move settles into long_rest, a jump into short_rest. During
