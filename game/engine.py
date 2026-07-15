@@ -19,17 +19,31 @@ class GameEngine:
     with fakes/stubs instead of monkeypatching.
     """
 
-    def __init__(self, board, rule_engine, arbiter, win_condition, config):
+    def __init__(self, board, rule_engine, arbiter, win_condition, config,
+                 move_log, scoreboard, notation):
         self._board = board
         self._rule_engine = rule_engine
         self._arbiter = arbiter
         self._win_condition = win_condition
         self._config = config
+        self._move_log = move_log
+        self._scoreboard = scoreboard
+        self._notation = notation
         self._game_over = False
 
     @property
     def game_over(self):
         return self._game_over
+
+    @property
+    def move_log(self):
+        """Read-only handle on the recorded moves (for the read model / view)."""
+        return self._move_log
+
+    @property
+    def scoreboard(self):
+        """Read-only handle on the running score (for the read model / view)."""
+        return self._scoreboard
 
     @property
     def clock(self):
@@ -148,8 +162,24 @@ class GameEngine:
     # -- internal helpers -------------------------------------------------
 
     def _apply_events(self, events):
-        """React to arrivals reported by the arbiter. The arbiter reports what
-        was captured; the engine owns whether that ends the game."""
+        """React to arrivals reported by the arbiter: record the completed move,
+        credit a capture to the score, and let the injected WinCondition decide
+        whether that capture ends the game. The arbiter reports what happened;
+        the engine owns the running record and the game-over decision."""
         for event in events:
+            self._record_move(event)
+            if event.captured is not None:
+                self._award_capture(event)
             if self._win_condition.is_game_over(event.captured):
                 self._game_over = True
+
+    def _record_move(self, event):
+        notation = self._notation.describe(
+            event.piece, event.origin, event.destination, event.captured
+        )
+        self._move_log.record(event.piece[0], notation, self._arbiter.clock)
+
+    def _award_capture(self, event):
+        # The arriving piece's color scores the captured piece's material value.
+        points = self._config.PIECE_VALUES.get(event.captured[1], 0)
+        self._scoreboard.award(event.piece[0], points)

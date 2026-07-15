@@ -24,6 +24,11 @@ PAWN_DIRECTION = {"w": -1, "b": 1}
 # Token used to represent an empty cell on the board
 EMPTY_CELL = "."
 
+# Point value of each piece kind, used by the score panel to credit a capture.
+# Standard chess material values; the king is 0 because capturing it ends the
+# game (the win condition), so it is never scored as material.
+PIECE_VALUES = {"P": 1, "N": 3, "B": 3, "R": 5, "Q": 9, "K": 0}
+
 # Gameplay policy: may several moves be in flight at the same time?
 # True is the real-time KungFu Chess default: there are no turns, so both
 # players move at once and a single player may start further moves while an

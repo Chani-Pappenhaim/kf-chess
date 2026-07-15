@@ -21,6 +21,9 @@ from rules.game_conditions import KingCaptureWinCondition, LastRankPromotion
 from game.engine import GameEngine
 from game.board_mapper import BoardMapper
 from game.controller import Controller
+from game.move_log import MoveLog
+from game.scoreboard import Scoreboard
+from game.notation import CoordinateNotation
 
 
 def build_registry(config):
@@ -50,6 +53,9 @@ def build_engine(board, registry, config):
         arbiter=arbiter,
         win_condition=KingCaptureWinCondition(),
         config=config,
+        move_log=MoveLog(),
+        scoreboard=Scoreboard(config.COLORS),
+        notation=CoordinateNotation(board.height),
     )
 
 

@@ -10,6 +10,9 @@ from rules.game_conditions import (
 )
 from realtime.real_time_arbiter import RealTimeArbiter
 from game.engine import GameEngine
+from game.move_log import MoveLog
+from game.scoreboard import Scoreboard
+from game.notation import CoordinateNotation
 from rules.reasons import Reason
 from view.renderer import BoardRenderer
 
@@ -58,6 +61,9 @@ def make_engine(rows, win_condition=None, promotion_rule=None, config=settings):
         arbiter=arbiter,
         win_condition=win_condition or KingCaptureWinCondition(),
         config=config,
+        move_log=MoveLog(),
+        scoreboard=Scoreboard(config.COLORS),
+        notation=CoordinateNotation(board.height),
     )
     return engine, board
 
@@ -298,6 +304,41 @@ def test_jump_on_busy_cell_is_rejected():
     result = engine.request_jump((0, 0))
     assert not result.is_accepted
     assert result.reason == Reason.BUSY_CELL
+
+
+def test_completed_move_is_recorded_in_the_move_log():
+    # 3-row board, so row 0 is rank 3: wR a3 -> c3.
+    engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
+    engine.request_move((0, 0), (0, 2))
+    engine.wait(2 * settings.MOVE_DURATION)
+
+    entries = engine.move_log.entries("w")
+    assert len(entries) == 1
+    assert entries[0].notation == "Ra3-c3"
+    assert entries[0].color == "w"
+    assert entries[0].time_ms == 2 * settings.MOVE_DURATION
+
+
+def test_capture_is_recorded_with_x_and_awards_material():
+    engine, _ = make_engine([["wR", ".", "bP"], [".", ".", "."], [".", ".", "."]])
+    engine.request_move((0, 0), (0, 2))  # rook captures the black pawn
+    engine.wait(2 * settings.MOVE_DURATION)
+
+    assert engine.move_log.entries("w")[0].notation == "Ra3xc3"
+    assert engine.scoreboard.score("w") == settings.PIECE_VALUES["P"]
+    assert engine.scoreboard.score("b") == 0
+
+
+def test_intercepted_move_is_not_recorded():
+    # The move is captured mid-flight by the jump, so it never arrives and so
+    # produces no arrival event - nothing is recorded and no points are awarded.
+    engine, _ = make_engine([["wR", "bP", "."], [".", ".", "."], [".", ".", "."]])
+    engine.request_move((0, 0), (0, 1))
+    engine.request_jump((0, 1))
+    engine.wait(settings.JUMP_DURATION)
+
+    assert engine.move_log.entries() == ()
+    assert engine.scoreboard.score("b") == 0
 
 
 def test_snapshot_is_readonly_view_of_state():

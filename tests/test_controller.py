@@ -7,6 +7,9 @@ from realtime.real_time_arbiter import RealTimeArbiter
 from game.engine import GameEngine
 from game.board_mapper import BoardMapper
 from game.controller import Controller
+from game.move_log import MoveLog
+from game.scoreboard import Scoreboard
+from game.notation import CoordinateNotation
 
 
 def make_controller(rows):
@@ -18,6 +21,9 @@ def make_controller(rows):
         arbiter=RealTimeArbiter(board=board, promotion_rule=LastRankPromotion(settings.PAWN_DIRECTION), config=settings),
         win_condition=KingCaptureWinCondition(),
         config=settings,
+        move_log=MoveLog(),
+        scoreboard=Scoreboard(settings.COLORS),
+        notation=CoordinateNotation(board.height),
     )
     controller = Controller(engine=engine, board_mapper=BoardMapper(board, settings.CELL_SIZE))
     return controller, engine, board

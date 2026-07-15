@@ -12,10 +12,13 @@ class ArrivalEvent:
     The arbiter mutates the board itself, but it does not decide the win
     condition - it only reports which token (if any) was captured, so the
     GameEngine can apply its injected WinCondition. `piece` is the token as
-    placed at the destination (already promoted if a promotion applied).
+    placed at the destination (already promoted if a promotion applied), and
+    `origin` is the cell it moved from - the board has already cleared that
+    source by the time the event is handled, so the move recorder gets it here.
     """
 
     piece: str
+    origin: tuple
     destination: tuple
     captured: str | None
 
@@ -169,7 +172,7 @@ class RealTimeArbiter:
         # A completed move settles into a long rest before the piece can act
         # again (the state the move animation transitions into).
         self._begin_cooldown((r, c), "long_rest", self._config.LONG_REST_DURATION)
-        return ArrivalEvent(piece=piece, destination=(r, c), captured=captured)
+        return ArrivalEvent(piece=piece, origin=move.start, destination=(r, c), captured=captured)
 
     def _is_intercepted(self, move):
         r, c = move.end
