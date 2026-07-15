@@ -18,9 +18,9 @@ def test_left_click_becomes_a_controller_click():
     assert controller.calls == [("click", 30, 40)]
 
 
-def test_right_click_becomes_a_controller_jump():
+def test_double_click_becomes_a_controller_jump():
     controller = _RecordingController()
-    InputTranslator(controller).handle(("right", 10, 20))
+    InputTranslator(controller).handle(("double", 10, 20))
     assert controller.calls == [("jump", 10, 20)]
 
 

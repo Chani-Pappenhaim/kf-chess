@@ -9,9 +9,9 @@ registered per window - so splitting them would only share that handle around.
 
 Raw device events are returned as small tuples for the input layer to
 translate; Window itself decides no game semantics:
-    ("left",  x, y)   left mouse button pressed at pixel (x, y)
-    ("right", x, y)   right mouse button pressed
-    ("quit",)         ESC / q pressed, or the window was closed
+    ("left",   x, y)   left mouse button pressed at pixel (x, y)
+    ("double", x, y)   left mouse button double-clicked
+    ("quit",)          ESC / q pressed, or the window was closed
 """
 from __future__ import annotations
 
@@ -30,10 +30,10 @@ class Window:  # pragma: no cover - thin GUI shell, exercised only at runtime
         cv2.setMouseCallback(title, self._on_mouse)
 
     def _on_mouse(self, event, x, y, flags, param):
-        if event == cv2.EVENT_LBUTTONDOWN:
+        if event == cv2.EVENT_LBUTTONDBLCLK:
+            self._pending.append(("double", x, y))
+        elif event == cv2.EVENT_LBUTTONDOWN:
             self._pending.append(("left", x, y))
-        elif event == cv2.EVENT_RBUTTONDOWN:
-            self._pending.append(("right", x, y))
 
     def show(self, canvas):
         """Present a fully composed canvas Img in the window."""

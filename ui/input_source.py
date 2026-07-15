@@ -2,9 +2,9 @@
 
 One instance per input source, so adding a second player later is just a second
 (source, controller) pair - the engine and rendering are untouched. Window emits
-device events (a mouse button at a pixel, or quit); this maps left-click to the
-Controller's select/move and right-click to jump. Quit is not a game command, so
-it is ignored here and left for the loop to act on.
+device events (a mouse button at a pixel, or quit); this maps a single left click
+to the Controller's select/move and a left double-click to jump. Quit is not a
+game command, so it is ignored here and left for the loop to act on.
 """
 from __future__ import annotations
 
@@ -17,5 +17,5 @@ class InputTranslator:
         kind = event[0]
         if kind == "left":
             self._controller.click(event[1], event[2])
-        elif kind == "right":
+        elif kind == "double":
             self._controller.jump(event[1], event[2])
