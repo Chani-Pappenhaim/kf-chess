@@ -2,18 +2,14 @@
 
 Repository: https://github.com/Chani-Pappenhaim/kf-chess
 """
+from __future__ import annotations
+
 import sys
 
 from config import settings
-from rules.rule_registry import build_default_registry
-from rules.rule_engine import RuleEngine
-from rules.game_conditions import KingCaptureWinCondition, LastRankPromotion
-from realtime.real_time_arbiter import RealTimeArbiter
+from game.composition import build_registry, build_game
 from game.parser import parse_input
 from board.loaders import load_text_board, BoardParseError
-from game.board_mapper import BoardMapper
-from game.engine import GameEngine
-from game.controller import Controller
 from view.renderer import BoardRenderer
 
 
@@ -23,7 +19,7 @@ def run(input_lines, config=settings):
     monkeypatching the settings module.
     """
     board_lines, commands = parse_input(input_lines)
-    registry = build_default_registry(config)
+    registry = build_registry(config)
 
     try:
         board = load_text_board(board_lines, registry, config)
@@ -31,22 +27,7 @@ def run(input_lines, config=settings):
         print("ERROR", error)
         return
 
-    arbiter = RealTimeArbiter(
-        board=board,
-        promotion_rule=LastRankPromotion(config.PAWN_DIRECTION),
-        config=config,
-    )
-    engine = GameEngine(
-        board=board,
-        rule_engine=RuleEngine(rule_registry=registry, config=config),
-        arbiter=arbiter,
-        win_condition=KingCaptureWinCondition(),
-        config=config,
-    )
-    controller = Controller(
-        engine=engine,
-        board_mapper=BoardMapper(board, config.CELL_SIZE),
-    )
+    engine, controller = build_game(board, registry, config)
     renderer = BoardRenderer()
 
     for command in commands:
