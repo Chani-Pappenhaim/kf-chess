@@ -306,6 +306,19 @@ def test_jump_on_busy_cell_is_rejected():
     assert result.reason == Reason.BUSY_CELL
 
 
+def test_legal_targets_lists_moves_for_a_piece():
+    engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
+    assert set(engine.legal_targets((0, 0))) == {(0, 1), (0, 2), (1, 0), (2, 0)}
+
+
+def test_legal_targets_is_empty_after_game_over():
+    rows = [["wR", ".", "bK"], ["wN", ".", "."], [".", ".", "."]]
+    engine, _ = make_engine(rows)
+    engine.request_move((0, 0), (0, 2))
+    engine.wait(2 * settings.MOVE_DURATION)  # captures bK -> game over
+    assert engine.legal_targets((1, 0)) == ()  # the knight can no longer be hinted
+
+
 def test_completed_move_is_recorded_in_the_move_log():
     # 3-row board, so row 0 is rank 3: wR a3 -> c3.
     engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])

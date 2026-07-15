@@ -20,6 +20,16 @@ class Controller:
     def selected(self):
         return self._selected
 
+    @property
+    def legal_targets(self):
+        """Cells the currently-selected piece may move to - the move hints the
+        view highlights next to the selection. Empty when nothing is selected.
+        Derived from the selection (a UI concern) and kept here with it, so the
+        engine stays a pure application service."""
+        if self._selected is None:
+            return ()
+        return self._engine.legal_targets(self._selected)
+
     def click(self, x, y):
         cell = self._mapper.pixel_to_cell(x, y)
         if cell is None:

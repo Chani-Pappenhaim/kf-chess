@@ -54,3 +54,18 @@ class RuleEngine:
             return MoveValidation(False, Reason.ILLEGAL_PIECE_MOVE)
 
         return MoveValidation(True, Reason.OK)
+
+    def legal_targets(self, board, start):
+        """Every cell the piece on `start` may legally move to right now.
+
+        Runs the same per-square validation as validate_move against the whole
+        board, so it inherits all of it: captures are included, friendly-occupied
+        and path-blocked squares are excluded, and an empty or off-board source
+        yields nothing. Read-only - it never mutates the board.
+        """
+        return tuple(
+            (r, c)
+            for r in range(board.height)
+            for c in range(board.width)
+            if self.validate_move(board, start, (r, c)).is_valid
+        )

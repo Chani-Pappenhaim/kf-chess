@@ -14,8 +14,11 @@ from graphics.img import Img
 
 _HIGHLIGHT_COLOR = (0, 255, 0, 90)   # translucent green (BGRA) - selection
 _RESTING_COLOR = (0, 0, 255, 110)    # translucent red (BGRA) - cooldown
+_MOVE_HINT_COLOR = (60, 60, 60, 110)     # translucent dark dot - a reachable empty square
+_CAPTURE_HINT_COLOR = (60, 60, 210, 120)  # translucent red tint - a capturable square
 _RESTING_STATES = ("short_rest", "long_rest")
 _HOP_HEIGHT_RATIO = 0.5              # peak jump lift, as a fraction of a cell
+_MOVE_HINT_RATIO = 0.3              # move-hint dot size, as a fraction of a cell
 
 
 class GraphicsRenderer:
@@ -25,13 +28,18 @@ class GraphicsRenderer:
         self._origin_x, self._origin_y = origin
         self._highlight = solid(cell_size, cell_size, _HIGHLIGHT_COLOR)
         self._hop_height = int(cell_size * _HOP_HEIGHT_RATIO)
+        dot = int(cell_size * _MOVE_HINT_RATIO)
+        self._move_hint = solid(dot, dot, _MOVE_HINT_COLOR)
+        self._capture_hint = solid(cell_size, cell_size, _CAPTURE_HINT_COLOR)
+        self._dot_offset = (cell_size - dot) // 2
 
-    def render(self, model, background, clock_ms=0, selected=None):
+    def render(self, model, background, clock_ms=0, selected=None, targets=()):
         """Draw the model over a copy of `background`, returning a new canvas.
-        The selected cell is highlighted under the pieces; a piece in its rest
-        cooldown gets a red veil that drains from the top down as the cooldown
-        elapses, so the piece reads as unavailable and the shrinking veil shows
-        how much rest is left."""
+        The selected cell is highlighted and its legal destinations are hinted
+        (a dot on an empty square, a red tint on a square it can capture on),
+        both under the pieces; a piece in its rest cooldown gets a red veil that
+        drains from the top down as the cooldown elapses, so the piece reads as
+        unavailable and the shrinking veil shows how much rest is left."""
         canvas = Img()
         canvas.img = background.img.copy()
         if selected is not None:
@@ -39,6 +47,7 @@ class GraphicsRenderer:
             self._highlight.draw_on(
                 canvas, self._origin_x + col * self._cell, self._origin_y + row * self._cell
             )
+        self._draw_targets(canvas, targets, model)
         for piece in model.pieces:
             animation = self._sprites.animation(piece.token, piece.state)
             frame = animation.frame_at(clock_ms)
@@ -47,6 +56,20 @@ class GraphicsRenderer:
             if piece.state in _RESTING_STATES:
                 self._draw_rest_veil(canvas, piece)
         return canvas
+
+    def _draw_targets(self, canvas, targets, model):
+        """Hint each cell the selected piece may move to. A target that already
+        holds a piece is a capture (red cell tint); an empty target gets a small
+        centred dot. Occupancy is read from the model the renderer already has,
+        so no rules leak into the view."""
+        occupied = {piece.cell for piece in model.pieces}
+        for row, col in targets:
+            x = self._origin_x + col * self._cell
+            y = self._origin_y + row * self._cell
+            if (row, col) in occupied:
+                self._capture_hint.draw_on(canvas, x, y)
+            else:
+                self._move_hint.draw_on(canvas, x + self._dot_offset, y + self._dot_offset)
 
     def _draw_rest_veil(self, canvas, piece):
         """Draw the red cooldown veil over a resting piece. It covers the whole

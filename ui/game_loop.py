@@ -34,7 +34,8 @@ class GameLoop:
         self._engine.wait(dt)
         model = self._engine.render_model()
         canvas = self._renderer.render(
-            model, self._base, clock_ms=model.clock, selected=self._controller.selected
+            model, self._base, clock_ms=model.clock,
+            selected=self._controller.selected, targets=self._controller.legal_targets,
         )
         self._hud.draw(canvas, model)
         self._window.show(canvas)

@@ -110,3 +110,24 @@ def test_selection_highlight_tints_the_selected_cell():
     assert canvas.img[105, 205][1] > 0
     # a cell that was not selected stays untouched.
     assert canvas.img[5, 5][1] == 0
+
+
+def test_move_hint_dot_marks_an_empty_target():
+    cell = 100
+    renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)
+    model = RenderModel(pieces=(), width=8, height=8)
+    canvas = renderer.render(model, _FakeBackground(8 * cell), targets=((2, 3),))
+    # empty target (2, 3): a small dot at the cell centre raises the pixel there.
+    assert canvas.img[250, 350][0] > 0
+    # a cell with no hint stays untouched.
+    assert canvas.img[550, 550][0] == 0
+
+
+def test_capture_hint_tints_an_occupied_target():
+    cell = 100
+    renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)
+    enemy = RenderPiece("bP", (2, 3))
+    model = RenderModel(pieces=(enemy,), width=8, height=8)
+    canvas = renderer.render(model, _FakeBackground(8 * cell), targets=((2, 3),))
+    # occupied target -> red tint over the whole cell (red channel, BGRA index 2).
+    assert canvas.img[210, 310][2] > 0

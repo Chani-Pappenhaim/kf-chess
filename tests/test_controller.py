@@ -45,6 +45,17 @@ def test_first_click_on_empty_cell_selects_nothing():
     assert controller.selected is None
 
 
+def test_legal_targets_is_empty_when_nothing_is_selected():
+    controller, engine, board = make_controller([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
+    assert controller.legal_targets == ()
+
+
+def test_legal_targets_reflects_the_selected_piece():
+    controller, engine, board = make_controller([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
+    controller.click(*cell_to_pixel(0, 0))  # select the rook
+    assert set(controller.legal_targets) == {(0, 1), (0, 2), (1, 0), (2, 0)}
+
+
 def test_click_outside_board_with_no_selection_is_ignored():
     controller, engine, board = make_controller([["wK", "."], [".", "."]])
     controller.click(-10, -10)

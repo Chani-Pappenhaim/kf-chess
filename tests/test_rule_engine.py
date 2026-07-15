@@ -25,6 +25,27 @@ def test_empty_source_is_rejected():
     assert result.reason == Reason.EMPTY_SOURCE
 
 
+def test_legal_targets_lists_every_reachable_square():
+    engine, board = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
+    assert set(engine.legal_targets(board, (0, 0))) == {(0, 1), (0, 2), (1, 0), (2, 0)}
+
+
+def test_legal_targets_include_captures_and_exclude_friendly_and_blocked():
+    # rook at (0,0): a friendly pawn blocks the row to the right, an enemy pawn
+    # down the column is capturable, and squares behind it stay blocked.
+    engine, board = make_engine([["wR", "wP", "."], [".", ".", "."], ["bP", ".", "."]])
+    targets = engine.legal_targets(board, (0, 0))
+    assert (1, 0) in targets       # empty square down the column
+    assert (2, 0) in targets       # capture the enemy pawn
+    assert (0, 1) not in targets   # friendly piece blocks
+    assert (0, 2) not in targets   # blocked behind the friendly piece
+
+
+def test_legal_targets_of_an_empty_square_is_empty():
+    engine, board = make_engine([[".", ".", "."]])
+    assert engine.legal_targets(board, (0, 0)) == ()
+
+
 def test_friendly_destination_is_rejected():
     engine, board = make_engine([["wR", "wP", "."]])
     result = engine.validate_move(board, (0, 0), (0, 1))

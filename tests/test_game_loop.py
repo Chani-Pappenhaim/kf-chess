@@ -19,8 +19,8 @@ class _FakeRenderer:
     def __init__(self):
         self.calls = []
 
-    def render(self, model, base, clock_ms=0, selected=None):
-        self.calls.append((model, base, clock_ms, selected))
+    def render(self, model, base, clock_ms=0, selected=None, targets=()):
+        self.calls.append((model, base, clock_ms, selected, targets))
         return "canvas"
 
 
@@ -50,6 +50,7 @@ class _FakeWindow:
 
 class _FakeController:
     selected = (1, 2)
+    legal_targets = ((3, 4), (5, 6))
 
 
 class _FakeTranslator:
@@ -81,10 +82,11 @@ def test_tick_advances_renders_and_shows():
 
     assert keep_going is True
     assert engine.waited == [16]                    # engine advanced by dt
-    model, base, clock_ms, selected = renderer.calls[0]
+    model, base, clock_ms, selected, targets = renderer.calls[0]
     assert base == "base"
     assert clock_ms == 1234                          # uses model.clock
     assert selected == (1, 2)                        # controller selection
+    assert targets == ((3, 4), (5, 6))               # controller move hints
     assert hud.drawn == [("canvas", model)]          # hud drew the rendered canvas
     assert window.shown == ["canvas"]                # canvas presented
 

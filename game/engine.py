@@ -63,6 +63,14 @@ class GameEngine:
             and not self._board.is_empty(*cell)
         )
 
+    def legal_targets(self, cell):
+        """Cells the piece on `cell` may currently move to, for the UI's move
+        hints. A read-only query on the public command boundary: it delegates
+        legality to the RuleEngine and returns nothing once the game is over."""
+        if self._game_over:
+            return ()
+        return self._rule_engine.legal_targets(self._board, cell)
+
     def request_move(self, start, end):
         self._apply_events(self._arbiter.resolve())
         if self._game_over:
