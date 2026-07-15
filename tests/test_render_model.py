@@ -20,6 +20,22 @@ def test_render_model_places_a_known_piece():
     assert kings[0].cell == (7, 4)
 
 
+def test_render_model_starts_with_no_moves_and_zero_scores():
+    model = play.build_engine(settings).render_model()
+    assert model.moves == ()
+    assert model.scores == {"w": 0, "b": 0}
+
+
+def test_render_model_lists_a_completed_move():
+    engine = play.build_engine(settings)
+    engine.request_move((6, 0), (5, 0))   # white pawn a2 -> a3
+    engine.wait(settings.MOVE_DURATION)
+    model = engine.render_model()
+    assert len(model.moves) == 1
+    assert model.moves[0].color == "w"
+    assert model.moves[0].notation == "a2-a3"
+
+
 def test_render_model_marks_a_moving_piece_with_progress():
     engine = play.build_engine(settings)
     engine.request_move((6, 0), (5, 0))  # a one-step pawn move

@@ -8,7 +8,7 @@ what a future networked server would serialise and send to a thin client.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -29,3 +29,5 @@ class RenderModel:
     height: int
     game_over: bool = False
     clock: int = 0  # elapsed simulated time in ms (for the HUD)
+    moves: tuple = ()  # MoveRecord per completed move, in order (both colors)
+    scores: dict = field(default_factory=dict)  # {color: accumulated points}

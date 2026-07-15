@@ -123,6 +123,8 @@ class GameEngine:
             height=self._board.height,
             game_over=self._game_over,
             clock=self._arbiter.clock,
+            moves=self._move_log.entries(),
+            scores=self._scoreboard.as_dict(),
         )
 
     def _render_piece(self, token, cell, motions):
