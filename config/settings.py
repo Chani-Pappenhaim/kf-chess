@@ -35,11 +35,12 @@ EMPTY_CELL = "."
 # whoever started first.
 ALLOW_CONCURRENT_MOVES = True
 
-# Cooldown after a completed action (milliseconds). Matches the CTD26 rest
-# animations: a move settles into long_rest, a jump into short_rest. During
-# the cooldown the piece may not act (see RealTimeArbiter / Reason.RESTING).
-LONG_REST_DURATION = 833
-SHORT_REST_DURATION = 625
+# Cooldown after a completed action (milliseconds). A move settles into
+# long_rest, a jump into short_rest; during the cooldown the piece may not act
+# (see RealTimeArbiter / Reason.RESTING). The move cooldown is set here to 5s;
+# a jump is a lighter action, so its cooldown is deliberately shorter.
+LONG_REST_DURATION = 5000   # after a move
+SHORT_REST_DURATION = 3000  # after a jump
 
 # --- Graphical UI (assets, window, real-time loop) -------------------------
 # Only the graphics/ and ui/ layers read these; the command-script path
