@@ -59,12 +59,15 @@ def build_engine(board, registry, config):
     )
 
 
-def build_game(board, registry, config):
+def build_game(board, registry, config, board_origin=(0, 0)):
     """build_engine plus a Controller wired with a BoardMapper.
 
     The full graph for an interactive entry point: returns the engine and a
-    Controller that turns pixel clicks/jumps into engine commands.
+    Controller that turns pixel clicks/jumps into engine commands. `board_origin`
+    is the board's top-left pixel on the canvas; it defaults to (0, 0) for the
+    text/VPL path (board-local click coordinates) and is set by the graphical
+    entry point to the framed board's offset.
     """
     engine = build_engine(board, registry, config)
-    controller = Controller(engine, BoardMapper(board, config.CELL_SIZE))
+    controller = Controller(engine, BoardMapper(board, config.CELL_SIZE, board_origin))
     return engine, controller

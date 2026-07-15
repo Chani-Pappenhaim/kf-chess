@@ -19,7 +19,7 @@ def test_load_board_background_matches_logical_size():
     assert (width, height) == (settings.BOARD_PX, settings.BOARD_PX)
 
 
-def test_new_base_canvas_spans_board_plus_hud_strip():
+def test_new_base_canvas_spans_the_full_framed_window():
     canvas = play.new_base_canvas(settings)
     height, width = canvas.img.shape[:2]
-    assert (width, height) == (settings.BOARD_PX, settings.CANVAS_HEIGHT)
+    assert (width, height) == (settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT)

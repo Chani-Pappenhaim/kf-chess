@@ -19,9 +19,10 @@ _HOP_HEIGHT_RATIO = 0.5              # peak jump lift, as a fraction of a cell
 
 
 class GraphicsRenderer:
-    def __init__(self, sprite_library, cell_size):
+    def __init__(self, sprite_library, cell_size, origin=(0, 0)):
         self._sprites = sprite_library
         self._cell = cell_size
+        self._origin_x, self._origin_y = origin
         self._highlight = solid(cell_size, cell_size, _HIGHLIGHT_COLOR)
         self._hop_height = int(cell_size * _HOP_HEIGHT_RATIO)
 
@@ -35,7 +36,9 @@ class GraphicsRenderer:
         canvas.img = background.img.copy()
         if selected is not None:
             row, col = selected
-            self._highlight.draw_on(canvas, col * self._cell, row * self._cell)
+            self._highlight.draw_on(
+                canvas, self._origin_x + col * self._cell, self._origin_y + row * self._cell
+            )
         for piece in model.pieces:
             animation = self._sprites.animation(piece.token, piece.state)
             frame = animation.frame_at(clock_ms)
@@ -55,15 +58,15 @@ class GraphicsRenderer:
         if height <= 0:
             return
         row, col = piece.cell
-        top = row * self._cell + (self._cell - height)
+        top = self._origin_y + row * self._cell + (self._cell - height)
         veil = solid(self._cell, height, _RESTING_COLOR)
-        veil.draw_on(canvas, col * self._cell, top)
+        veil.draw_on(canvas, self._origin_x + col * self._cell, top)
 
     def _top_left(self, piece, frame):
         row, col = self._current_cell(piece)
         frame_h, frame_w = frame.img.shape[:2]
-        x = int(col * self._cell + (self._cell - frame_w) / 2)
-        y = int(row * self._cell + (self._cell - frame_h) / 2)
+        x = int(self._origin_x + col * self._cell + (self._cell - frame_w) / 2)
+        y = int(self._origin_y + row * self._cell + (self._cell - frame_h) / 2)
         if piece.state == "jump":
             # Lift the piece along the hop so the jump reads as a jump; clamp to
             # the top edge so a piece on the back rank never draws off-canvas.

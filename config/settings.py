@@ -61,5 +61,22 @@ BOARD_CSV = os.path.join(ASSETS_ROOT, "board.csv")
 WINDOW_TITLE = "KungFu Chess"
 FPS = 60
 BOARD_PX = 8 * CELL_SIZE  # board background is rendered at 8 cells * CELL_SIZE
-HUD_HEIGHT = 70           # strip below the board for score / time
-CANVAS_HEIGHT = BOARD_PX + HUD_HEIGHT
+
+# Full-window layout: the board sits framed by a coordinate gutter (file/rank
+# labels) with a move-list panel on each side, a title strip on top, and a score
+# strip both above and below the board. The board's on-canvas origin is derived
+# from these, and BoardMapper/GraphicsRenderer are offset by it so clicks and
+# sprites still land on the right cell. Only the graphical path uses these; the
+# text/VPL path never offsets the board (BoardMapper defaults to origin 0,0).
+COORD_GUTTER = 28   # strip around the board for the a-h / 1-8 labels
+PANEL_WIDTH = 250   # each side move-list panel (Black on the left, White right)
+TITLE_HEIGHT = 46   # top strip for the "Name:" title
+SCORE_HEIGHT = 40   # score strip, one above and one below the board
+
+BOARD_ORIGIN_X = PANEL_WIDTH + COORD_GUTTER
+BOARD_ORIGIN_Y = TITLE_HEIGHT + SCORE_HEIGHT + COORD_GUTTER
+WINDOW_WIDTH = 2 * (PANEL_WIDTH + COORD_GUTTER) + BOARD_PX
+WINDOW_HEIGHT = TITLE_HEIGHT + 2 * SCORE_HEIGHT + 2 * COORD_GUTTER + BOARD_PX
+
+# Name shown in the top title strip as "Name: <PLAYER_NAME>".
+PLAYER_NAME = "Player"

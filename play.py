@@ -21,7 +21,7 @@ from ui.graphics_renderer import GraphicsRenderer
 from ui.hud import Hud
 from ui.input_source import InputTranslator
 
-_STRIP_COLOR = (30, 30, 30, 255)  # dark HUD strip below the board
+_BACKGROUND_COLOR = (238, 238, 238, 255)  # light window background around the board
 
 
 def load_board_background(config=settings):
@@ -31,9 +31,11 @@ def load_board_background(config=settings):
 
 
 def new_base_canvas(config=settings):
-    """Full window canvas: the board at the top and a blank HUD strip below."""
-    canvas = solid(config.BOARD_PX, config.CANVAS_HEIGHT, _STRIP_COLOR)
-    load_board_background(config).draw_on(canvas, 0, 0)
+    """Full window canvas: the light background with the board drawn at its framed
+    origin, leaving room for the side panels, coordinate gutter, title and scores
+    that the Hud draws on top each frame."""
+    canvas = solid(config.WINDOW_WIDTH, config.WINDOW_HEIGHT, _BACKGROUND_COLOR)
+    load_board_background(config).draw_on(canvas, config.BOARD_ORIGIN_X, config.BOARD_ORIGIN_Y)
     return canvas
 
 
@@ -55,9 +57,12 @@ def build_engine(config=settings):
 
 
 def build_game(config=settings):
-    """Compose the engine plus a Controller wired to it, ready to drive input."""
+    """Compose the engine plus a Controller wired to it, ready to drive input.
+    The controller's BoardMapper is offset by the framed board origin so clicks
+    on the shifted board still resolve to the right cell."""
     board, registry = _compose(config)
-    return _build_game(board, registry, config)
+    origin = (config.BOARD_ORIGIN_X, config.BOARD_ORIGIN_Y)
+    return _build_game(board, registry, config, board_origin=origin)
 
 
 def run(config=settings):  # pragma: no cover - real-time GUI loop
@@ -67,7 +72,8 @@ def run(config=settings):  # pragma: no cover - real-time GUI loop
     engine, controller = build_game(config)
     translator = InputTranslator(controller)
     sprites = AssetLoader(config).load_sprite_library()
-    renderer = GraphicsRenderer(sprites, config.CELL_SIZE)
+    origin = (config.BOARD_ORIGIN_X, config.BOARD_ORIGIN_Y)
+    renderer = GraphicsRenderer(sprites, config.CELL_SIZE, origin=origin)
     hud = Hud(config)
     base = new_base_canvas(config)
     GameLoop(window, engine, controller, renderer, hud, translator, base).run()
