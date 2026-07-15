@@ -1,6 +1,7 @@
 """Window - the cv2 window + input adapter.
 
-The only module besides Img that imports cv2. Drawing never happens here: a
+One of the graphics/ modules that import cv2 (alongside Img and the asset
+loader). Drawing never happens here: a
 fully composed canvas Img is handed to show(). Presentation and input sit in
 one class because cv2 binds them to a single window handle - waitKey both
 refreshes the imshow buffer and returns keystrokes, and the mouse callback is

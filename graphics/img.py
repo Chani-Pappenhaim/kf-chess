@@ -2,8 +2,10 @@
 
 Source: KamaTechOrg/CTD26 (py/img.py) - https://github.com/KamaTechOrg/CTD26
 This is the attached library the assignment mandates: all on-screen drawing
-must go through this class. It wraps OpenCV; keeping it here means only this
-module (and graphics/window.py, for the window + input) imports cv2.
+must go through this class. It wraps OpenCV; keeping it here means cv2 lives
+only in the graphics/ package (Img, graphics/window.py for the window + input,
+and graphics/assets.py for loading sprites) - all on-screen drawing goes through
+Img.
 """
 from __future__ import annotations
 
