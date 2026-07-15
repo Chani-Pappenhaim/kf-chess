@@ -55,6 +55,19 @@ class RealTimeArbiter:
     def is_jumping_on(self, cell):
         return any(jump.cell == cell for jump in self._active_jumps)
 
+    def jump_progress(self, cell):
+        """How far a jumping piece is through its hop (0.0 at take-off, 1.0 on
+        landing), or None if nothing is airborne on `cell`. Lets the view lift
+        the piece along an arc so the jump is visible."""
+        total = self._config.JUMP_DURATION
+        for jump in self._active_jumps:
+            if jump.cell == cell:
+                if total <= 0:
+                    return 1.0
+                elapsed = total - (jump.end_time - self._clock)
+                return max(0.0, min(1.0, elapsed / total))
+        return None
+
     def cooldown_of(self, cell):
         """The rest state a piece on `cell` is in ('short_rest' after a jump,
         'long_rest' after a move), or None if it is free to act. Checks the

@@ -40,6 +40,17 @@ def test_render_model_marks_a_jumping_piece():
     assert jumper[0].state == "jump"
 
 
+def test_render_model_reports_hop_progress_for_a_jumping_piece():
+    engine = play.build_engine(settings)
+    engine.request_jump((6, 0))
+    engine.wait(settings.JUMP_DURATION // 2)  # mid-hop
+    jumper = [piece for piece in engine.render_model().pieces if piece.cell == (6, 0)]
+    assert len(jumper) == 1
+    piece = jumper[0]
+    assert piece.state == "jump"
+    assert 0 < piece.progress < 1
+
+
 def test_render_model_reports_cooldown_progress_for_a_resting_piece():
     engine = play.build_engine(settings)
     engine.request_move((6, 0), (5, 0))       # a one-step pawn move

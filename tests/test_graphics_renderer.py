@@ -53,6 +53,21 @@ def test_moving_piece_is_interpolated_between_cells():
     assert _render(100, 100, piece) == [(100, 0)]
 
 
+def test_jumping_piece_is_lifted_along_the_hop():
+    # cell 100, sprite 60 -> idle sits at y = 320 for row 3. Mid-hop (progress
+    # 0.5) lifts it by the full hop height (0.5 * 100 = 50) -> y = 270.
+    idle = _render(100, 60, RenderPiece("wP", (3, 3)))
+    jumping = _render(100, 60, RenderPiece("wP", (3, 3), state="jump", progress=0.5))
+    assert idle == [(320, 320)]
+    assert jumping == [(320, 270)]  # same column, lifted upward
+
+
+def test_jumping_piece_is_grounded_at_the_hop_ends():
+    # At take-off/landing (progress 0 and 1) there is no lift: same as idle.
+    assert _render(100, 60, RenderPiece("wP", (3, 3), state="jump", progress=0.0)) == [(320, 320)]
+    assert _render(100, 60, RenderPiece("wP", (3, 3), state="jump", progress=1.0)) == [(320, 320)]
+
+
 def test_resting_piece_is_veiled_red():
     cell = 100
     renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)

@@ -125,7 +125,12 @@ class GameEngine:
                 progress=motion.progress,
             )
         if self._arbiter.is_jumping_on(cell):
-            return RenderPiece(token=token, cell=cell, state="jump")
+            return RenderPiece(
+                token=token,
+                cell=cell,
+                state="jump",
+                progress=self._arbiter.jump_progress(cell) or 0.0,
+            )
         rest_state = self._arbiter.cooldown_of(cell)
         if rest_state is not None:
             return RenderPiece(

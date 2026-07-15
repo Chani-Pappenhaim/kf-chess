@@ -3,8 +3,9 @@
 The graphical counterpart of view.BoardRenderer: it consumes a read model (and
 a sprite library) and produces a canvas Img, touching neither the engine nor
 cv2. It maps each piece's domain state to a sprite (SpriteLibrary), picks the
-current frame, and positions it - interpolating a piece that is mid-move so it
-slides between cells. All drawing goes through Img.draw_on.
+current frame, and positions it - sliding a piece that is mid-move between cells
+and lifting a jumping piece along an arc so the hop is visible. All drawing goes
+through Img.draw_on.
 """
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ from graphics.img import Img
 _HIGHLIGHT_COLOR = (0, 255, 0, 90)   # translucent green (BGRA) - selection
 _RESTING_COLOR = (0, 0, 255, 110)    # translucent red (BGRA) - cooldown
 _RESTING_STATES = ("short_rest", "long_rest")
+_HOP_HEIGHT_RATIO = 0.5              # peak jump lift, as a fraction of a cell
 
 
 class GraphicsRenderer:
@@ -21,6 +23,7 @@ class GraphicsRenderer:
         self._sprites = sprite_library
         self._cell = cell_size
         self._highlight = solid(cell_size, cell_size, _HIGHLIGHT_COLOR)
+        self._hop_height = int(cell_size * _HOP_HEIGHT_RATIO)
 
     def render(self, model, background, clock_ms=0, selected=None):
         """Draw the model over a copy of `background`, returning a new canvas.
@@ -61,7 +64,16 @@ class GraphicsRenderer:
         frame_h, frame_w = frame.img.shape[:2]
         x = int(col * self._cell + (self._cell - frame_w) / 2)
         y = int(row * self._cell + (self._cell - frame_h) / 2)
+        if piece.state == "jump":
+            # Lift the piece along the hop so the jump reads as a jump; clamp to
+            # the top edge so a piece on the back rank never draws off-canvas.
+            y = max(0, y - self._hop_arc(piece.progress))
         return x, y
+
+    def _hop_arc(self, progress):
+        """Vertical lift at `progress` of a hop: a parabola that is 0 at take-off
+        and landing and peaks at `_hop_height` mid-flight (4p(1-p))."""
+        return int(self._hop_height * 4 * progress * (1 - progress))
 
     def _current_cell(self, piece):
         """The (possibly fractional) cell to draw at: the destination when

@@ -59,6 +59,21 @@ def test_completed_jump_leaves_a_short_rest_cooldown():
     assert arbiter.cooldown_of((0, 0)) == "short_rest"
 
 
+def test_jump_progress_rises_from_zero_towards_one_mid_hop():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    arbiter.start_jump("wR", (0, 0))
+    assert arbiter.jump_progress((0, 0)) == 0.0
+
+    arbiter.advance_time(settings.JUMP_DURATION // 2)  # mid-hop
+    midway = arbiter.jump_progress((0, 0))
+    assert 0.4 < midway < 0.6
+
+
+def test_jump_progress_is_none_when_not_airborne():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    assert arbiter.jump_progress((0, 0)) is None
+
+
 def test_cooldown_clears_after_its_duration():
     arbiter, _ = make_arbiter([["wR", ".", "."]])
     arbiter.start_move("wR", (0, 0), (0, 1))
