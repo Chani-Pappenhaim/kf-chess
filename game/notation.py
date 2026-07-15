@@ -40,6 +40,10 @@ class CoordinateNotation(MoveNotation):
 
     def describe(self, piece, origin, dest, captured):
         letter = "" if piece[1] == "P" else piece[1]
+        if origin == dest:
+            # A stationary capture: a jumping piece intercepted a mover on its
+            # own square without moving, so name the one square only ('Nxe4').
+            return f"{letter}x{self._square(dest)}"
         separator = "x" if captured is not None else "-"
         return f"{letter}{self._square(origin)}{separator}{self._square(dest)}"
 

@@ -161,7 +161,7 @@ def test_promotion_applied_on_arrival():
     assert events[0].piece == "wQ"
 
 
-def test_jump_intercepts_arriving_enemy_and_emits_no_event():
+def test_jump_intercepts_arriving_enemy_and_credits_the_jumper():
     arbiter, board = make_arbiter([["wR", "bP", "."]])
     arbiter.start_move("wR", (0, 0), (0, 1))
     arbiter.start_jump("bP", (0, 1))
@@ -169,7 +169,12 @@ def test_jump_intercepts_arriving_enemy_and_emits_no_event():
 
     assert board.get(0, 1) == "bP"  # target unchanged
     assert board.is_empty(0, 0)  # mover captured mid-flight
-    assert events == []
+    # The jumping piece captured the mover in place, so it emits an event
+    # crediting itself (origin == destination) with capturing the wR.
+    assert len(events) == 1
+    assert events[0].piece == "bP"
+    assert events[0].captured == "wR"
+    assert events[0].origin == events[0].destination == (0, 1)
 
 
 def test_friendly_piece_at_destination_cancels_arrival():

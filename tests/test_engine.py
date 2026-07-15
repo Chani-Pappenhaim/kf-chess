@@ -342,16 +342,19 @@ def test_capture_is_recorded_with_x_and_awards_material():
     assert engine.scoreboard.score("b") == 0
 
 
-def test_intercepted_move_is_not_recorded():
-    # The move is captured mid-flight by the jump, so it never arrives and so
-    # produces no arrival event - nothing is recorded and no points are awarded.
+def test_intercepted_move_is_recorded_and_scored_for_the_jumper():
+    # The move is captured mid-flight by the jump. The jumping piece is credited
+    # with the capture, so it is recorded in the log and scores the mover's value.
     engine, _ = make_engine([["wR", "bP", "."], [".", ".", "."], [".", ".", "."]])
     engine.request_move((0, 0), (0, 1))
     engine.request_jump((0, 1))
     engine.wait(settings.JUMP_DURATION)
 
-    assert engine.move_log.entries() == ()
-    assert engine.scoreboard.score("b") == 0
+    assert engine.scoreboard.score("b") == settings.PIECE_VALUES["R"]
+    assert engine.scoreboard.score("w") == 0
+    black_entries = engine.move_log.entries("b")
+    assert len(black_entries) == 1
+    assert black_entries[0].notation == "xb3"  # pawn capture in place on b3
 
 
 def test_snapshot_is_readonly_view_of_state():

@@ -151,11 +151,20 @@ class RealTimeArbiter:
         return distance * self._config.MOVE_DURATION
 
     def _settle_move(self, move):
-        if self._is_intercepted(move):
+        interceptor = self._interceptor_of(move)
+        if interceptor is not None:
             # The moving piece is captured mid-flight by the jumping piece,
             # so it is removed from its source rather than surviving there.
             self._board.set(*move.start, self._config.EMPTY_CELL)
-            return None
+            # The jumping piece stayed on its own cell, so origin == destination;
+            # it is credited with the capture so the score, move log and win
+            # condition all see it (an intercepted king still ends the game).
+            return ArrivalEvent(
+                piece=interceptor.piece,
+                origin=interceptor.cell,
+                destination=interceptor.cell,
+                captured=move.piece,
+            )
 
         r, c = move.end
         target = self._board.get(r, c)
@@ -174,12 +183,14 @@ class RealTimeArbiter:
         self._begin_cooldown((r, c), "long_rest", self._config.LONG_REST_DURATION)
         return ArrivalEvent(piece=piece, origin=move.start, destination=(r, c), captured=captured)
 
-    def _is_intercepted(self, move):
+    def _interceptor_of(self, move):
+        """The opposing jumping piece sitting on this move's destination, if
+        any - it intercepts and captures the mover on arrival."""
         r, c = move.end
-        return any(
-            jump.cell == (r, c) and jump.piece[0] != move.piece[0]
-            for jump in self._active_jumps
-        )
+        for jump in self._active_jumps:
+            if jump.cell == (r, c) and jump.piece[0] != move.piece[0]:
+                return jump
+        return None
 
     def _resolve_jumps(self):
         airborne = []
