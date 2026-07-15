@@ -7,7 +7,7 @@ these.
 """
 
 # Rendering / timing (milliseconds)
-CELL_SIZE = 100
+CELL_SIZE = 70
 MOVE_DURATION = 1000
 JUMP_DURATION = 1000
 
