@@ -239,6 +239,22 @@ def test_blocked_at_first_step_leaves_no_event_and_no_cooldown():
     assert arbiter.cooldown_of((0, 1)) is None
 
 
+def test_uncapturable_enemy_at_first_step_leaves_no_trace():
+    """Sibling of the same-colour case: a pawn stepping straight onto an
+    ADJACENT enemy it may not capture is blocked on its very first step, so it
+    never advances - no event, no cooldown, and the enemy is untouched."""
+    arbiter, board = make_arbiter([["bP"], ["wP"]])
+    # Single-cell straight step (final == first cell); pawns can't capture ahead.
+    arbiter.start_move("wP", (1, 0), ((0, 0),), False)
+    events = arbiter.advance_time(MD)
+
+    assert events == []                 # never advanced -> no event
+    assert board.get(1, 0) == "wP"      # stays on source
+    assert board.get(0, 0) == "bP"      # enemy NOT captured
+    assert arbiter.has_active_motion() is False
+    assert arbiter.cooldown_of((1, 0)) is None   # no cooldown at all
+
+
 # --- Layer C: capture at the final cell -------------------------------------
 
 def test_capture_at_final_cell():
