@@ -95,17 +95,17 @@ class RealTimeArbiter:
     def cooldown_progress(self, cell):
         """How far a resting piece is through its cooldown: 0.0 the instant the
         rest begins, rising to 1.0 as it ends (None once free to act again).
-        Lets the view drain the rest veil from the top down as time elapses."""
+        Lets the view drain the rest veil from the top down as time elapses.
+
+        A live entry always satisfies ``start <= clock < expiry`` - resolve()
+        prunes an entry the moment its expiry passes (and a zero-length rest is
+        pruned before it is ever observed) - so the ratio is a well-defined
+        0..1 with no elapsed-or-degenerate-duration guard needed here."""
         entry = self._cooldowns.get(cell)
         if entry is None:
             return None
         _rest_state, start, expiry = entry
-        if self._clock >= expiry:
-            return None
-        total = expiry - start
-        if total <= 0:
-            return 1.0
-        return max(0.0, min(1.0, (self._clock - start) / total))
+        return max(0.0, min(1.0, (self._clock - start) / (expiry - start)))
 
     def is_resting(self, cell):
         return self.cooldown_of(cell) is not None

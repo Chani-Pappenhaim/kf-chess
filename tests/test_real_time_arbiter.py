@@ -7,6 +7,8 @@ the arbiter touches (get/set/is_empty/relocate/height/width) - so if any test
 passes, it proves the arbiter needs nothing from the rules layer.
 """
 
+import types
+
 from config import settings
 from realtime.real_time_arbiter import RealTimeArbiter
 
@@ -141,6 +143,20 @@ def test_jump_progress_rises_from_zero_towards_one_mid_hop():
 def test_jump_progress_is_none_when_not_airborne():
     arbiter, _ = make_arbiter([["wR", ".", "."]])
     assert arbiter.jump_progress((0, 0)) is None
+
+
+def test_jump_progress_is_one_immediately_when_jump_is_instant():
+    """Guard for a zero-length JUMP_DURATION config: an airborne piece reads as
+    fully landed (1.0) instead of dividing by zero. A jump can be observed at
+    take-off (start_jump, then render, before any advance), so unlike a cooldown
+    this degenerate-duration branch is reachable and is exercised here."""
+    instant = types.SimpleNamespace(
+        **{name: getattr(settings, name) for name in dir(settings) if name.isupper()}
+    )
+    instant.JUMP_DURATION = 0
+    arbiter = RealTimeArbiter(FakeBoard([["wR", ".", "."]]), NoPromotion(), instant)
+    arbiter.start_jump("wR", (0, 0))
+    assert arbiter.jump_progress((0, 0)) == 1.0
 
 
 # --- single-cell timing (a step has not arrived before its duration) --------
