@@ -35,3 +35,15 @@ class MovementStrategy(ABC):
     @abstractmethod
     def is_legal(self, dr: int, dc: int, context: MoveContext) -> bool:
         ...
+
+    def path(self, start, end):
+        """The cells this piece steps through to reach `end`, excluding the
+        source and including the destination. Pure geometry: it never reads
+        board occupancy (that is judged at run time as the arbiter walks it).
+
+        The atomic default is a single leap `(end,)` — no intermediate cells —
+        which is exactly right for King and Knight (a knight's L-jump has no
+        squares to pass through). Sliding pieces (Rook/Bishop/Queen/Pawn)
+        override this to return the full line between the endpoints.
+        """
+        return (end,)

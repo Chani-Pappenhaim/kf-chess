@@ -39,6 +39,27 @@ class Board:
     def is_empty(self, row, col):
         return self._cells[row][col] == self._empty_token
 
+    def relocate(self, src, dst):
+        """The single named write for a piece that is moving: pick the token up
+        off `src` and put it down on `dst`, then leave `src` empty.
+
+        Deliberately DUMB and single-purpose. It always overwrites whatever sits
+        on `dst` and reports nothing about it - it does NOT read the destination,
+        does NOT tell anyone a capture happened, and does NOT apply promotion.
+        The arbiter is the one that owns those decisions: it reads `dst` (for a
+        capture) BEFORE calling this, and applies promotion at the settle cell
+        AFTER. Routing every moving-piece mutation through this one method keeps
+        the "move a token across the board" write in exactly one place, so no
+        caller ever hand-rolls a set()+clear() pair (and risks forgetting the
+        clear, or ordering src/dst wrong when src == dst-adjacent).
+
+        `src` and `dst` are (row, col) tuples.
+        """
+        sr, sc = src
+        dr, dc = dst
+        self._cells[dr][dc] = self._cells[sr][sc]
+        self._cells[sr][sc] = self._empty_token
+
     def snapshot(self):
         """Return a read-only copy of the grid for rendering, so callers can
         never mutate the board through the value they get back."""

@@ -93,7 +93,14 @@ class GameEngine:
         if not self._config.ALLOW_CONCURRENT_MOVES and self._arbiter.has_active_motion():
             return MoveResult(False, Reason.MOTION_IN_PROGRESS)
 
-        self._arbiter.start_move(self._board.get(*start), start, end)
+        # Turn the validated request into a stepping recipe (path + whether a
+        # capture on the final cell is legal) via the rules layer, then hand it
+        # to the arbiter. The arbiter walks the plan cell by cell and never
+        # consults the rules layer itself - all piece knowledge stays here.
+        plan = self._rule_engine.build_plan(self._board, start, end)
+        self._arbiter.start_move(
+            self._board.get(*start), start, plan.path, plan.may_capture_final
+        )
         return MoveResult(True, Reason.OK)
 
     def request_jump(self, cell):

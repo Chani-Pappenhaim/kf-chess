@@ -5,22 +5,46 @@ def _shape_delta(dr, dc):
     return abs(dr), abs(dc)
 
 
+def _unit_step(start, end):
+    """The one-cell direction vector from start toward end along a straight or
+    diagonal line. Each component is the sign of the corresponding delta
+    (-1, 0 or +1), so this is the single place the "which way, one square"
+    sign logic lives. Pure geometry; reads no occupancy.
+    """
+    sr, sc = start
+    er, ec = end
+    return (er > sr) - (er < sr), (ec > sc) - (ec < sc)
+
+
+def line_cells(start, end):
+    """Ordered cells from the square AFTER start up to and INCLUDING end,
+    stepping one unit at a time along the straight/diagonal line between them.
+
+    The source is EXCLUDED and the destination is INCLUDED, so a straight
+    double-step yields (mid, end) and any single/diagonal step yields (end,).
+    Pure geometry: it walks the line by direction alone and reads no board
+    occupancy (occupancy is judged elsewhere, at run time).
+    """
+    dr, dc = _unit_step(start, end)
+    r, c = start
+    cells = []
+    while (r, c) != end:
+        r += dr
+        c += dc
+        cells.append((r, c))
+    return tuple(cells)
+
+
 def path_is_clear(board, start, end):
     """Shared sliding-piece helper: True if every square strictly between
     start and end is empty. Used by Rook, Bishop and Queen so the check is
     written once (DRY) instead of duplicated per piece.
+
+    Reuses line_cells so the sign/step geometry lives ONLY in _unit_step:
+    line_cells(start, end)[:-1] is exactly the cells strictly between the
+    endpoints (drop the final cell, which is `end` itself).
     """
-    sr, sc = start
-    er, ec = end
-    dr = (er > sr) - (er < sr)
-    dc = (ec > sc) - (ec < sc)
-    r, c = sr + dr, sc + dc
-    while (r, c) != (er, ec):
-        if not board.is_empty(r, c):
-            return False
-        r += dr
-        c += dc
-    return True
+    return all(board.is_empty(*cell) for cell in line_cells(start, end)[:-1])
 
 
 class KingMovement(MovementStrategy):
@@ -35,6 +59,12 @@ class RookMovement(MovementStrategy):
             return False
         return path_is_clear(context.board, context.start, context.end)
 
+    def path(self, start, end):
+        """The straight line of cells the rook steps through, excluding the
+        source and including the destination. Pure geometry (no occupancy);
+        the arbiter judges blockage cell-by-cell as it walks this path."""
+        return line_cells(start, end)
+
 
 class BishopMovement(MovementStrategy):
     def is_legal(self, dr, dc, context):
@@ -42,6 +72,12 @@ class BishopMovement(MovementStrategy):
         if not (r == c and r != 0):
             return False
         return path_is_clear(context.board, context.start, context.end)
+
+    def path(self, start, end):
+        """The diagonal line of cells the bishop steps through, excluding the
+        source and including the destination. Pure geometry (no occupancy);
+        the arbiter judges blockage cell-by-cell as it walks this path."""
+        return line_cells(start, end)
 
 
 class QueenMovement(MovementStrategy):
@@ -52,6 +88,12 @@ class QueenMovement(MovementStrategy):
         if not (straight or diagonal):
             return False
         return path_is_clear(context.board, context.start, context.end)
+
+    def path(self, start, end):
+        """The straight-or-diagonal line of cells the queen steps through,
+        excluding the source and including the destination. Pure geometry
+        (no occupancy); the arbiter judges blockage as it walks this path."""
+        return line_cells(start, end)
 
 
 class KnightMovement(MovementStrategy):
@@ -97,3 +139,10 @@ class PawnMovement(MovementStrategy):
             return True
 
         return False
+
+    def path(self, start, end):
+        """The cells the pawn steps through, excluding the source and including
+        the destination. Pure geometry via the shared line walker: a straight
+        double-step yields (mid, end), while a single or diagonal step yields
+        (end,) with no pawn-specific branch. Occupancy is judged elsewhere."""
+        return line_cells(start, end)

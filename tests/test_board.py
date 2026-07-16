@@ -41,3 +41,35 @@ def test_empty_board_dimensions():
     board = Board([])
     assert board.width == 0
     assert board.height == 0
+
+
+def test_relocate_moves_token_and_clears_src():
+    board = Board([[".", "."], [".", "."]])
+    board.set(0, 0, "wR")
+    board.relocate((0, 0), (0, 1))
+    assert board.get(0, 1) == "wR"
+    assert board.is_empty(0, 0) is True
+
+
+def test_relocate_overwrites_occupied_dst():
+    board = Board([[".", "."], [".", "."]])
+    board.set(0, 0, "wR")
+    board.set(0, 1, "bP")
+    # relocate is dumb: it overwrites the enemy on dst and reports nothing
+    # about the capture - the return value is None regardless.
+    result = board.relocate((0, 0), (0, 1))
+    assert result is None
+    assert board.get(0, 1) == "wR"
+    assert board.is_empty(0, 0) is True
+
+
+def test_relocate_leaves_other_cells_untouched():
+    board = Board([["wK", ".", "bK"], [".", "wR", "."]])
+    board.relocate((1, 1), (1, 2))
+    assert board.get(1, 2) == "wR"
+    assert board.is_empty(1, 1) is True
+    # every cell not named in the relocate is exactly as before
+    assert board.get(0, 0) == "wK"
+    assert board.is_empty(0, 1) is True
+    assert board.get(0, 2) == "bK"
+    assert board.is_empty(1, 0) is True

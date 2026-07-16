@@ -357,6 +357,59 @@ def test_intercepted_move_is_recorded_and_scored_for_the_jumper():
     assert black_entries[0].notation == "xb3"  # pawn capture in place on b3
 
 
+def test_blocked_pawn_stops_on_the_last_square_it_reached():
+    # The headline step-movement case. A pawn double-steps b2->b4 (through b3)
+    # while a friendly queen a4->b4 lands on the destination first. The pawn
+    # advances one square to b3, finds the destination occupied by a friendly
+    # piece, and MUST stop on b3 - it must NOT snap back to its source b2 (the
+    # old atomic behaviour), and it must not capture straight ahead.
+    rows = [
+        ["wQ", ".", "."],
+        [".", ".", "."],
+        [".", "wP", "."],
+        [".", ".", "."],
+    ]
+    engine, board = make_engine(rows)
+    engine.request_move((2, 1), (0, 1))  # pawn double step b2 -> b4
+    engine.request_move((0, 0), (0, 1))  # friendly queen a4 -> b4, arrives first
+
+    engine.wait(2 * settings.MOVE_DURATION)
+
+    assert board.get(1, 1) == "wP"   # stopped on the mid square (b3)
+    assert board.is_empty(2, 1)      # it left its source and did NOT snap back
+    assert board.get(0, 1) == "wQ"   # the friendly queen was not captured
+    # The partial advance is a real, recorded move ending on the square it
+    # actually reached - not the destination it was aiming for.
+    entries = engine.move_log.entries("w")
+    pawn_entry = [e for e in entries if e.notation == "b2-b3"]
+    assert len(pawn_entry) == 1
+
+
+def test_slider_stops_when_a_friendly_piece_crosses_its_path():
+    # Cross-traffic blocking, which falls out of the same stepping mechanism.
+    # A rook climbs column c (c1->c5) while a same-colour queen crosses row 3
+    # (a3->e3). The queen reaches the intersection c3 the moment the rook tries
+    # to enter it; because the queen was requested first it claims c3, so the
+    # rook is stuck one square up from its source, at c2.
+    rows = [
+        [".", ".", ".", ".", "."],
+        [".", ".", ".", ".", "."],
+        ["wQ", ".", ".", ".", "."],
+        [".", ".", ".", ".", "."],
+        [".", ".", "wR", ".", "."],
+    ]
+    engine, board = make_engine(rows)
+    engine.request_move((2, 0), (2, 4))  # queen a3 -> e3 (requested first)
+    engine.request_move((4, 2), (0, 2))  # rook c1 -> c5
+
+    engine.wait(5 * settings.MOVE_DURATION)
+
+    assert board.get(3, 2) == "wR"   # rook stuck at c2 (one square up from c1)
+    assert board.is_empty(4, 2)      # rook left its source, did not snap back
+    assert board.get(2, 4) == "wQ"   # the queen completed its crossing
+    assert engine.move_log.entries("w")  # both moves recorded
+
+
 def test_snapshot_is_readonly_view_of_state():
     engine, board = make_engine([["wK", "."], [".", "bK"]])
     snap = engine.snapshot()
