@@ -241,6 +241,24 @@ def test_move_from_a_resting_piece_is_rejected():
     assert result.reason == Reason.RESTING
 
 
+def test_jump_from_a_piece_resting_after_a_move_is_rejected():
+    engine, _ = make_engine([["wR", ".", "."]])
+    engine.request_move((0, 0), (0, 1))
+    engine.wait(settings.MOVE_DURATION)  # arrives at (0, 1), now in long_rest
+    result = engine.request_jump((0, 1))
+    assert not result.is_accepted
+    assert result.reason == Reason.RESTING
+
+
+def test_jump_from_a_piece_resting_after_a_jump_is_rejected():
+    engine, _ = make_engine([["wR", ".", "."]])
+    engine.request_jump((0, 0))
+    engine.wait(settings.JUMP_DURATION)  # lands, now in short_rest
+    result = engine.request_jump((0, 0))
+    assert not result.is_accepted
+    assert result.reason == Reason.RESTING
+
+
 def test_resting_piece_cannot_be_selected():
     engine, _ = make_engine([["wR", ".", "."]])
     engine.request_move((0, 0), (0, 1))

@@ -109,6 +109,8 @@ class GameEngine:
             return MoveResult(False, Reason.GAME_OVER)
         if self.is_busy(cell):
             return MoveResult(False, Reason.BUSY_CELL)
+        if self._arbiter.is_resting(cell):
+            return MoveResult(False, Reason.RESTING)
         if self._board.is_empty(*cell):
             return MoveResult(False, Reason.EMPTY_CELL)
 
