@@ -3,7 +3,7 @@ from game.board_mapper import BoardMapper
 
 
 def _mapper(origin=(0, 0)):
-    return BoardMapper(Board([[".", "."], [".", "."]]), 100, origin)
+    return BoardMapper(Board([[".", "."], [".", "."]], "."), 100, origin)
 
 
 def test_maps_pixel_to_cell_without_offset():

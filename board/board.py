@@ -13,7 +13,7 @@ class Board:
     outside this class touches it directly.
     """
 
-    def __init__(self, rows, empty_token="."):
+    def __init__(self, rows, empty_token):
         self._cells = [list(row) for row in rows]
         self._empty_token = empty_token
         self._height = len(self._cells)

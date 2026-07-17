@@ -48,7 +48,7 @@ class _ConfigOverride:
 
 
 def make_engine(rows, win_condition=None, promotion_rule=None, config=settings):
-    board = Board(rows)
+    board = Board(rows, ".")
     registry = build_default_registry(config)
     arbiter = RealTimeArbiter(
         board=board,

@@ -23,11 +23,11 @@ def context(board, color, start, end):
 
 
 def empty_board(width=8, height=8):
-    return Board([["."] * width for _ in range(height)])
+    return Board([["."] * width for _ in range(height)], ".")
 
 
 def make_engine(rows):
-    board = Board(rows)
+    board = Board(rows, ".")
     registry = build_default_registry(settings)
     return RuleEngine(rule_registry=registry, config=settings), board
 

@@ -6,7 +6,7 @@ from rules.reasons import Reason
 
 
 def make_engine(rows):
-    board = Board(rows)
+    board = Board(rows, ".")
     registry = build_default_registry(settings)
     return RuleEngine(rule_registry=registry, config=settings), board
 

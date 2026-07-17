@@ -2,7 +2,7 @@ from board.board import Board
 
 
 def make_board():
-    return Board([["wK", ".", "bK"], [".", ".", "."]])
+    return Board([["wK", ".", "bK"], [".", ".", "."]], ".")
 
 
 def test_dimensions():
@@ -38,13 +38,13 @@ def test_snapshot_is_a_copy():
 
 
 def test_empty_board_dimensions():
-    board = Board([])
+    board = Board([], ".")
     assert board.width == 0
     assert board.height == 0
 
 
 def test_relocate_moves_token_and_clears_src():
-    board = Board([[".", "."], [".", "."]])
+    board = Board([[".", "."], [".", "."]], ".")
     board.set(0, 0, "wR")
     board.relocate((0, 0), (0, 1))
     assert board.get(0, 1) == "wR"
@@ -52,7 +52,7 @@ def test_relocate_moves_token_and_clears_src():
 
 
 def test_relocate_overwrites_occupied_dst():
-    board = Board([[".", "."], [".", "."]])
+    board = Board([[".", "."], [".", "."]], ".")
     board.set(0, 0, "wR")
     board.set(0, 1, "bP")
     # relocate is dumb: it overwrites the enemy on dst and reports nothing
@@ -64,7 +64,7 @@ def test_relocate_overwrites_occupied_dst():
 
 
 def test_relocate_leaves_other_cells_untouched():
-    board = Board([["wK", ".", "bK"], [".", "wR", "."]])
+    board = Board([["wK", ".", "bK"], [".", "wR", "."]], ".")
     board.relocate((1, 1), (1, 2))
     assert board.get(1, 2) == "wR"
     assert board.is_empty(1, 1) is True

@@ -13,7 +13,7 @@ from game.notation import CoordinateNotation
 
 
 def make_controller(rows):
-    board = Board(rows)
+    board = Board(rows, ".")
     registry = build_default_registry(settings)
     engine = GameEngine(
         board=board,
