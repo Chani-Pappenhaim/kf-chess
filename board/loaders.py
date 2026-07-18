@@ -6,10 +6,8 @@ class BoardParseError(Exception):
 
 
 def _valid_text_tokens(registry, colors, empty_token):
-    """Valid tokens are derived from whatever piece kinds are registered,
-    rather than a hardcoded string - so registering a custom piece kind
-    automatically makes its token accepted here too.
-    """
+    """All the tokens that are valid in text/CSV board input.
+    Each token is a two-character string: the piece kind followed by the color."""
     tokens = {empty_token}
     for color in colors:
         for kind in registry.registered_kinds():
@@ -17,15 +15,8 @@ def _valid_text_tokens(registry, colors, empty_token):
     return tokens
 
 
-def _ctd26_code_to_token(code):
-    """Translate a CTD26 board.csv cell code into an internal Board token.
-
-    CTD26 encodes a piece as KIND+COLOR in upper case (e.g. "PW", "KB"),
-    while the internal Board uses color+kind (e.g. "wP", "bK") because the
-    whole engine treats ``token[0]`` as the color. The two formats are a 1:1
-    mapping, translated here at the adapter boundary so no game-logic module
-    ever sees the external format.
-    """
+def csv_to_token(code):
+    
     if len(code) != 2:
         raise BoardParseError("UNKNOWN_TOKEN")
     kind, color = code[0], code[1].lower()
@@ -33,14 +24,7 @@ def _ctd26_code_to_token(code):
 
 
 def load_csv_board(rows, registry, config):
-    """Adapter that converts CTD26 CSV board rows into the internal Board.
-
-    Sibling of load_text_board for the ``board.csv`` format shipped with the
-    CTD26 assets: comma-separated cells, an empty field meaning an empty
-    square, and piece codes in CTD26's KIND+COLOR form (translated to internal
-    tokens via _ctd26_code_to_token). Same validation contract as the text
-    loader: rectangular board, every token recognised by the registry.
-    """
+    """Adapter that converts CSV board rows into the internal Board. """
     valid_tokens = _valid_text_tokens(registry, config.COLORS, config.EMPTY_CELL)
     grid = []
     width = None
@@ -51,7 +35,7 @@ def load_csv_board(rows, registry, config):
         tokens = []
         for field in line.split(","):
             field = field.strip()
-            tokens.append(config.EMPTY_CELL if field == "" else _ctd26_code_to_token(field))
+            tokens.append(config.EMPTY_CELL if field == "" else csv_to_token(field))
         if width is None:
             width = len(tokens)
         elif len(tokens) != width:
@@ -64,15 +48,7 @@ def load_csv_board(rows, registry, config):
 
 
 def load_text_board(rows, registry, config):
-    """Adapter that converts text board rows into the internal Board.
-
-    This is the text-format seam. To support another input format (e.g. a
-    binary board) add a sibling loader that likewise returns a Board; no
-    game-logic module needs to change, only main.py picks which loader to use.
-
-    Validates that the board is rectangular and that every token is one the
-    registry recognises, raising BoardParseError otherwise.
-    """
+    """Adapter that converts text board rows into the internal Board."""
     valid_tokens = _valid_text_tokens(registry, config.COLORS, config.EMPTY_CELL)
     grid = []
     width = None
