@@ -5,11 +5,10 @@ class UnknownPieceKindError(Exception):
 class PieceRuleRegistry:
     """Maps a piece-kind letter to its MovementStrategy.
 
-    This is the extension point required for custom games: registering a
-    new kind (e.g. "C" for a custom "Champion" piece) with its own
-    MovementStrategy is all that's needed to support it - no engine or
-    parser code has to change, and the piece automatically becomes a
-    valid board token (see game.parser).
+    The extension point for new piece kinds: registering a kind with its own
+    strategy is all it takes. Nothing else branches on the letter, and the board
+    loaders derive their valid tokens from what is registered here, so the new
+    piece is accepted in board input too.
     """
 
     def __init__(self):
@@ -31,9 +30,8 @@ class PieceRuleRegistry:
 def build_default_registry(config):
     """Factory for the standard chess piece set.
 
-    Kept separate from PieceRuleRegistry itself so alternate registries
-    (e.g. for a custom variant) can be assembled the same way without
-    subclassing anything.
+    Kept separate from PieceRuleRegistry so a different piece set is assembled
+    the same way, without subclassing anything.
     """
     from rules.piece_rules import (
         KingMovement,
