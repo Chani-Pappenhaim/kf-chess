@@ -1,9 +1,8 @@
-"""MoveLog - the ordered record of completed moves, grouped by color.
+"""The ordered record of completed moves.
 
-Domain state (a sibling of Scoreboard): the engine appends to it as moves
-settle, and the view reads it to render each player's move table. It stores only
-facts - the color, the already-formatted notation, and the time the move
-completed - so the log decides nothing about layout and nothing about legality.
+Written to as moves settle, read by the view to draw each player's move table.
+It stores only facts - color, the already-formatted text, and the time - so it
+decides nothing about layout.
 """
 from __future__ import annotations
 
