@@ -6,11 +6,7 @@ from rules.movement_strategy import MoveContext
 
 @dataclass(frozen=True)
 class MoveValidation:
-    """Result of a read-only legality check for a requested move.
-
-    `reason` is always present: ``Reason.OK`` for a legal move, or a stable
-    rule-level code otherwise.
-    """
+    """A legality verdict: Reason.OK, or the code explaining the refusal."""
 
     is_valid: bool
     reason: str
@@ -18,31 +14,14 @@ class MoveValidation:
 
 @dataclass(frozen=True)
 class MovePlan:
-    """The rules layer's precomputed recipe for stepping a validated move.
+    """A validated move, reduced to what is needed to step it."""
 
-    `path` is the ordered cells the piece walks through (source EXCLUDED, final
-    destination INCLUDED — pure geometry from the strategy). `may_capture_final`
-    says whether the piece may take an enemy sitting on that final cell (True
-    for sliders/king/knight/pawn-diagonal, False for a pawn moving straight).
-
-    Handing the arbiter this frozen plan keeps ALL piece knowledge in the rules
-    layer: the arbiter only walks the path and honours the flag, never asking a
-    piece anything.
-    """
-
-    path: tuple
-    may_capture_final: bool
+    path: tuple                # cells walked, source excluded, destination last
+    may_capture_final: bool    # false only for a pawn moving straight
 
 
 class RuleEngine:
-    """Validates whether a move is legal against the current board (Validation
-    Service). Read-only: it inspects board state and returns a MoveValidation
-    but never mutates the board, starts motion, or knows about game-over.
-
-    Stateless with respect to the board - the board is passed per call - so it
-    can be reused and tested in isolation. The piece-rule registry and config
-    are injected.
-    """
+    """Answers whether a move is legal. Read-only, and unaware of time."""
 
     def __init__(self, rule_registry, config):
         self._registry = rule_registry
@@ -74,17 +53,10 @@ class RuleEngine:
         return MoveValidation(True, Reason.OK)
 
     def may_capture(self, board, start, end):
-        """Whether the piece on `start` may capture an enemy occupying `end`.
+        """Whether the piece on `start` may capture an enemy on `end`.
 
-        Reuses the piece's own Strategy: it re-asks `is_legal` with a
-        MoveContext whose `target_occupied=True`, so the "can this shape take
-        on that square" knowledge stays inside the piece (the arbiter never
-        learns rules like "pawns can't capture straight").
-
-        CORRECTNESS CONTRACT: this is only meaningful when called at REQUEST
-        time, i.e. for a move whose path is clear. It answers the geometric
-        capture question in isolation — a pawn moving straight yields False
-        (straight captures are illegal), every other legal shape yields True.
+        Re-asks the piece's strategy with an occupied target, so a rule like
+        "a pawn cannot capture straight ahead" stays inside the piece.
         """
         piece = board.get(*start)
         strategy = self._registry.get(piece[1])
@@ -99,14 +71,7 @@ class RuleEngine:
         return strategy.is_legal(dr, dc, context)
 
     def build_plan(self, board, start, end):
-        """Build the MovePlan for a (presumed validated) move start -> end.
-
-        The single entry point the engine calls to turn a legal request into a
-        stepping recipe: it asks the piece's Strategy for its `path` (pure
-        geometry) and computes `may_capture_final` via `may_capture`. The
-        engine constructs no MoveContext and touches no strategy directly, so
-        the coordinator stays dumb and piece knowledge stays here.
-        """
+        """Turn a move into a MovePlan. Call only after validate_move accepts it."""
         piece = board.get(*start)
         strategy = self._registry.get(piece[1])
         return MovePlan(
@@ -115,13 +80,7 @@ class RuleEngine:
         )
 
     def legal_targets(self, board, start):
-        """Every cell the piece on `start` may legally move to right now.
-
-        Runs the same per-square validation as validate_move against the whole
-        board, so it inherits all of it: captures are included, friendly-occupied
-        and path-blocked squares are excluded, and an empty or off-board source
-        yields nothing. Read-only - it never mutates the board.
-        """
+        """Every cell the piece on `start` may move to right now."""
         return tuple(
             (r, c)
             for r in range(board.height)
