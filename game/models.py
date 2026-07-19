@@ -3,12 +3,10 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class MoveResult:
-    """The engine's answer at the public command boundary.
+    """The engine's answer to a command: accepted, or why it was refused.
 
-    For an accepted command `reason` is ``Reason.OK``; otherwise it carries a
-    stable rejection code (either copied from RuleEngine's MoveValidation or an
-    application-level reason such as ``game_over``/``motion_in_progress``). The
-    ``Reason`` codes themselves live in ``rules.reasons``.
+    The refusal may come from the rules or from the engine's own guards; either
+    way it is a code from rules.reasons.
     """
 
     is_accepted: bool

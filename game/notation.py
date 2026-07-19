@@ -1,9 +1,6 @@
-"""Move notation strategies - turn a completed move into its written form.
+"""Turns a completed move into its written form.
 
-A Strategy (like WinCondition / PromotionRule in rules.game_conditions) so the
-written form of a move can be swapped without touching the engine that records
-moves: coordinate notation is used now, and a standard-algebraic notation can be
-added later as another MoveNotation with no other change.
+Swappable, so a different notation is a new class here and nothing else.
 """
 from __future__ import annotations
 
@@ -25,14 +22,11 @@ class MoveNotation(ABC):
 
 
 class CoordinateNotation(MoveNotation):
-    """Full from-to coordinate notation: 'Ng1-f3', 'e2-e4', capture 'Rc3xc6'.
+    """Full from-to notation: 'Ng1-f3', 'e2-e4', capture 'Rc3xc6'.
 
-    Names both squares, so unlike standard algebraic notation it is always
-    unambiguous and always correct - it never needs disambiguation or check
-    detection (neither of which is well defined in this turn-less real-time
-    variant). The piece-kind letter is shown for every piece except the pawn
-    (kind 'P'), following chess convention. Rows map to ranks the way the board
-    is drawn: row 0 is the top rank (board_height) down to the bottom rank 1.
+    Naming both squares keeps it unambiguous without the disambiguation and
+    check detection that standard algebraic needs - neither of which is well
+    defined in a game without turns. Pawns carry no letter, by convention.
     """
 
     def __init__(self, board_height):
