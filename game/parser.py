@@ -1,10 +1,7 @@
 def parse_input(lines):
     """Split raw input lines into the 'Board:' and 'Commands:' sections.
 
-    This handles only the command-script protocol (which lines describe the
-    board vs. the commands). Turning the board lines into a Board is the job
-    of a board loader (see board/loaders.py), so this stays independent of how
-    any particular board format is validated or stored.
+    Only the split; turning the board lines into a Board is a loader's job.
     """
     board_lines, commands = [], []
     section = None
