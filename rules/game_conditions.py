@@ -42,3 +42,4 @@ class LastRankPromotion(PromotionRule):
         if row == last_rank:
             return color + self._promote_to
         return piece
+    
