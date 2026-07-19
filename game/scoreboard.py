@@ -1,9 +1,7 @@
-"""Scoreboard - accumulated capture points per color.
+"""Accumulated capture points per color.
 
-Domain state that, unlike a live piece count, cannot be derived from the board:
-captured pieces have already left it. So it is tracked here as captures happen -
-the engine awards points when a move settles with a capture, and the view reads
-the totals.
+Cannot be derived from the board - captured pieces have already left it - so it
+is tracked here as captures happen.
 """
 from __future__ import annotations
 
