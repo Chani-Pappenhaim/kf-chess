@@ -423,17 +423,17 @@ def test_interception_never_promotes():
     assert events[0].captured == "wP"
 
 
-# --- Layer C: is_moving_from keys off the CURRENT cell -----------------------
+# --- Layer C: is_mover_on keys off the CURRENT cell --------------------------
 
-def test_is_moving_from_tracks_the_current_cell_not_the_source():
+def test_is_mover_on_tracks_the_current_cell_not_the_source():
     arbiter, _ = make_arbiter([["wR", ".", "."]])
     arbiter.start_move("wR", (0, 0), ((0, 1), (0, 2)), True)
-    assert arbiter.is_moving_from((0, 0)) is True   # still on source
-    assert arbiter.is_moving_from((0, 1)) is False
+    assert arbiter.is_mover_on((0, 0)) is True   # still on source
+    assert arbiter.is_mover_on((0, 1)) is False
 
     arbiter.advance_time(MD)  # step to (0,1)
-    assert arbiter.is_moving_from((0, 0)) is False  # left the source
-    assert arbiter.is_moving_from((0, 1)) is True   # now here
+    assert arbiter.is_mover_on((0, 0)) is False  # left the source
+    assert arbiter.is_mover_on((0, 1)) is True   # now here
 
 
 def test_is_jumping_on_reports_the_airborne_cell():

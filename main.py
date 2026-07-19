@@ -14,10 +14,8 @@ from view.renderer import BoardRenderer
 
 
 def run(input_lines, config=settings):
-    """Parse input and execute all commands. `config` is injectable so
-    tests (or custom variants) can supply alternate settings without
-    monkeypatching the settings module.
-    """
+    """Parse a script and execute its commands. `config` is injectable so a
+    caller can supply alternate settings."""
     board_lines, commands = parse_input(input_lines)
     registry = build_registry(config)
 
@@ -51,10 +49,8 @@ def _dispatch(command, engine, controller, renderer):
 
 
 def main(input_stream=None):
-    """Read a script and run it. `input_stream` is injectable so tests can
-    supply a file-like object instead of monkeypatching sys.stdin; it defaults
-    to real stdin.
-    """
+    """Read a script from stdin and run it. `input_stream` is injectable so a
+    caller can supply a file-like object instead."""
     stream = sys.stdin if input_stream is None else input_stream
     lines = [line.strip() for line in stream]
     run(lines)

@@ -1,14 +1,11 @@
-"""Observers of completed game events (Observer pattern).
+"""Observers of completed game events.
 
-The engine announces each event to a list of observers instead of calling the
-move log, the scoreboard and anything else by name, so a new consumer - a sound
-player, an animation trigger, a broadcaster feeding remote clients - is a class
-here plus one subscribe() call at the composition root, and the engine does not
-change.
+The engine announces each event to a list of observers rather than calling the
+move log and the scoreboard by name, so a new consumer is a class here plus one
+subscribe() call - the engine does not change.
 
-Events are frozen DTOs that carry their own context (including when they
-happened), so an observer needs nothing but the event it is handed, and the same
-object can be serialised and sent over a network unchanged.
+Events carry their own context, including when they happened, so an observer
+needs nothing but the event it is handed.
 """
 from __future__ import annotations
 
@@ -20,16 +17,12 @@ class GameObserver(ABC):
 
     @abstractmethod
     def on_event(self, event):
-        """React to `event`. Observers that only care about some event types
-        filter here; the engine sends every event to every observer."""
+        """React to `event`. Every observer is sent every event, so one that
+        cares about only some types filters here."""
 
 
 class MoveRecorder(GameObserver):
-    """Writes each completed move to the move log in written notation.
-
-    Owns the formatting step so the log stores finished text and the engine
-    never touches notation.
-    """
+    """Writes each completed move to the move log in written notation."""
 
     def __init__(self, move_log, notation):
         self._move_log = move_log
@@ -43,8 +36,7 @@ class MoveRecorder(GameObserver):
 
 
 class CaptureScorer(GameObserver):
-    """Credits the arriving piece's color with the material value of whatever
-    it captured. Events without a capture are ignored."""
+    """Credits the arriving color with the value of whatever it captured."""
 
     def __init__(self, scoreboard, piece_values):
         self._scoreboard = scoreboard

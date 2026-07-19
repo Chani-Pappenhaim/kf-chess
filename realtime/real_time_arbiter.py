@@ -35,7 +35,7 @@ class RealTimeArbiter:
     def has_active_motion(self):
         return bool(self._active_moves)
 
-    def is_moving_from(self, cell):
+    def is_mover_on(self, cell):
         """Whether a piece in flight is currently sitting on ``cell``.
 
         Keyed off where the piece is now, not where it started, so a source it
