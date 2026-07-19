@@ -7,44 +7,17 @@ from realtime.models import Move, Jump, MotionView
 
 @dataclass(frozen=True)
 class ArrivalEvent:
-    """What the arbiter reports back when a moving piece terminates a step.
+    """A move that has ended, by settling on a cell or by being captured."""
 
-    The arbiter mutates the board itself, but it does not decide the win
-    condition - it only reports which token (if any) was captured, so the
-    GameEngine can apply its injected WinCondition. `piece` is the token as
-    placed at the destination (already promoted if a promotion applied),
-    `origin` is the move's ORIGINAL source (notation "from" - the board has
-    already cleared it), and `destination` is where the move actually stopped
-    (which may be short of the requested target if it was blocked in flight).
-    `at_ms` is the simulated clock when it happened, carried on the event itself
-    so an observer (or a remote client) never needs a second source for "when".
-    """
-
-    piece: str
-    origin: tuple
-    destination: tuple
-    captured: str | None
-    at_ms: int = 0
+    piece: str            # the token as placed, already promoted if it promoted
+    origin: tuple         # where the move began; the board has since cleared it
+    destination: tuple    # where it actually stopped, which may be short of the target
+    captured: str | None  # the token taken, if any
+    at_ms: int = 0        # clock time it happened
 
 
 class RealTimeArbiter:
-    """Owns all real-time motion: active Moves/Jumps, the simulated clock,
-    per-cell step timing, and step/settlement/interception resolution.
-
-    It is a PURE STEPPING MECHANISM. It walks a precomputed ``path`` (built by
-    the rules layer and handed in via ``start_move``) one cell per step, and
-    obeys a single ``may_capture_final`` flag; it never imports or queries the
-    rules layer, so it can be tested against a bare fake board. All piece
-    knowledge (who may capture how, what the geometry is) stays upstream.
-
-    Kept separate from GameEngine so the real-time model can be tested in
-    isolation, and so Board keeps representing only logical occupancy while
-    in-flight motion state lives here. Time never advances from the wall clock:
-    it only moves when `advance_time` is called with a delta.
-
-    Promotion happens on arrival, so the promotion rule is injected here (into
-    the layer that owns arrival), not into the engine.
-    """
+    """Simulates the passage of time and resolves moves, jumps, and cooldowns."""
 
     def __init__(self, board, promotion_rule, config):
         self._board = board
@@ -63,18 +36,19 @@ class RealTimeArbiter:
         return bool(self._active_moves)
 
     def is_moving_from(self, cell):
-        """Keyed off each move's CURRENT cell (where the piece now sits), so
-        busy-checks and the renderer find the piece at its live position rather
-        than at the source it has already stepped off."""
+        """Whether a piece in flight is currently sitting on ``cell``.
+
+        Keyed off where the piece is now, not where it started, so a source it
+        has already stepped off reads as free.
+        """
         return any(move.current == cell for move in self._active_moves)
 
     def is_jumping_on(self, cell):
         return any(jump.cell == cell for jump in self._active_jumps)
 
     def jump_progress(self, cell):
-        """How far a jumping piece is through its hop (0.0 at take-off, 1.0 on
-        landing), or None if nothing is airborne on `cell`. Lets the view lift
-        the piece along an arc so the jump is visible."""
+        """How far a jumping piece is through its jump: 0.0 the instant it leaves the cell, 
+        rising to 1.0 as it lands (None if no jump is in progress)."""
         total = self._config.JUMP_DURATION
         for jump in self._active_jumps:
             if jump.cell == cell:
@@ -85,10 +59,7 @@ class RealTimeArbiter:
         return None
 
     def cooldown_of(self, cell):
-        """The rest state a piece on `cell` is in ('short_rest' after a jump,
-        'long_rest' after a move), or None if it is free to act. Checks the
-        expiry against the current clock, so an elapsed cooldown reads as None
-        even before resolve() prunes it."""
+        """The rest state of a piece on ``cell``, if it is currently resting (None if free to act)."""
         entry = self._cooldowns.get(cell)
         if entry is None:
             return None
@@ -96,14 +67,8 @@ class RealTimeArbiter:
         return None if self._clock >= expiry else rest_state
 
     def cooldown_progress(self, cell):
-        """How far a resting piece is through its cooldown: 0.0 the instant the
-        rest begins, rising to 1.0 as it ends (None once free to act again).
-        Lets the view drain the rest veil from the top down as time elapses.
-
-        A live entry always satisfies ``start <= clock < expiry`` - resolve()
-        prunes an entry the moment its expiry passes (and a zero-length rest is
-        pruned before it is ever observed) - so the ratio is a well-defined
-        0..1 with no elapsed-or-degenerate-duration guard needed here."""
+        """How far a resting piece is through its cooldown: 0.0 the instant it begins resting,
+        rising to 1.0 as it becomes free to act (None if no cooldown is in progress"""
         entry = self._cooldowns.get(cell)
         if entry is None:
             return None
@@ -114,9 +79,9 @@ class RealTimeArbiter:
         return self.cooldown_of(cell) is not None
 
     def active_motions(self):
-        """Read-only views of the in-flight moves, each with its progress (0..1)
-        through its CURRENT sub-step - for the renderer to interpolate a piece
-        sliding from its current cell to the next."""
+        """ The current one-cell step of every piece in flight, for the view to interpolate.
+        Motion is resolved per cell, so this describes the step in progress,
+         not the whole move: the renderer slides the piece from `start` to `end` by `progress`."""
         return [self._motion_view(move) for move in self._active_moves]
 
     def _motion_view(self, move):
@@ -126,12 +91,12 @@ class RealTimeArbiter:
         return MotionView(move.piece, move.current, move.next_cell, progress)
 
     def start_move(self, piece, source, path, may_capture_final):
-        """Begin stepping ``piece`` from ``source`` along ``path`` (which
-        EXCLUDES source and ENDS at the final cell). ``may_capture_final`` says
-        whether an enemy sitting on the final cell may be captured. The first
-        step's arrival is scheduled off the current clock; every later step is
-        scheduled off the previous step's arrival (see ``resolve``), so there is
-        no clock drift over a multi-cell slide."""
+        """Begin stepping ``piece`` from ``source`` along ``path``.
+
+        Nothing moves yet: the piece stays on ``source`` until the first step
+        falls due. ``may_capture_final`` false means it stops short of an enemy
+        on the last cell instead of taking it.
+        """
         path = tuple(path)
         arrival = self._clock + self._move_total(source, path[0])
         self._active_moves.append(
@@ -149,14 +114,9 @@ class RealTimeArbiter:
     def resolve(self):
         """Advance every move that has become due, one cell at a time.
 
-        A single ``advance_time`` may cross several step boundaries, and several
-        moves may be in flight, so this loops: it repeatedly picks the due move
-        (arrival <= clock) with the SMALLEST arrival - tie-broken by insertion
-        order in ``_active_moves`` (whoever started first) - advances it exactly
-        ONE step, and recomputes. It never drains one move fully before the next,
-        so cross-traffic contention for a cell resolves deterministically:
-        whoever reaches the cell earlier (or, on a tie, started earlier) claims
-        it, and the other sees it occupied and stops.
+        Always takes the earliest due step next, tie-broken by who started
+        first, rather than draining one move before the next. Two pieces racing
+        for the same cell therefore resolve the same way every run.
         """
         events = []
         while True:
@@ -182,50 +142,43 @@ class RealTimeArbiter:
     # -- internal helpers -------------------------------------------------
 
     def _move_total(self, start, end):
-        """Time to travel from `start` to the adjacent-or-leaped `end`:
-        MOVE_DURATION per square of Chebyshev distance. Consecutive path cells
-        are adjacent (1x); a knight's atomic ``(end,)`` L-jump has Chebyshev
-        distance 2 (2x) - so leapers cost the right time with NO knight
-        special-case anywhere in the stepping code."""
+        """Time to travel from `start` to `end`: MOVE_DURATION per square of
+        Chebyshev distance. A one-cell step costs one; a leap costs its span, so
+        leapers are timed right without being special-cased."""
         distance = max(abs(end[0] - start[0]), abs(end[1] - start[1]))
         return distance * self._config.MOVE_DURATION
 
     def _step_move(self, move):
-        """Advance ``move`` by EXACTLY ONE cell and report what happened.
+        """Advance ``move`` by exactly one cell.
 
-        Returns ``(next_move, event)``: ``next_move`` is the move's new state if
-        it keeps stepping, or None if it terminated (settled, intercepted, or
-        dropped); ``event`` is the ArrivalEvent to emit, or None. Only terminal
-        outcomes go through ``_settle`` - a plain per-cell commit reserves
-        nothing.
+        Returns (next_move, event): next_move is None once the move has ended,
+        event is the ArrivalEvent to report, or None.
         """
         current = move.current
         target = move.next_cell
         token = self._board.get(*target)
         empty = self._config.EMPTY_CELL
 
-        # N empty: commit the step. If it was the final cell, settle there.
+        # Empty: commit the step, and settle if that was the last cell.
         if token == empty:
             self._board.relocate(current, target)
             if target == move.final:
                 return None, self._settle(move, target, None)
             return self._stepped(move), None
 
-        # N same colour: stop. Settle on the current cell iff we ever advanced;
-        # a move blocked at its very first step leaves no trace at all.
+        # Own piece ahead: stop where we are. A move blocked before it ever
+        # moved leaves no trace - no arrival, no cooldown.
         if token[0] == move.piece[0]:
             if move.advanced():
                 return None, self._settle(move, current, None)
             return None, None
 
-        # N enemy. Interception (destination-only) is tested BEFORE the capture
-        # branch, because a jumper on the FINAL cell captures the mover instead
-        # of being captured by it - the opposite outcome.
+        # Enemy on the destination. Interception is checked first: an airborne
+        # defender captures the mover rather than the other way round.
         if target == move.final:
             interceptor = self._jumper_on(target, move.piece)
             if interceptor is not None:
-                # The mover is captured on its CURRENT cell (not its long-gone
-                # source); the jumper stays put and is credited with the kill.
+                # The mover dies where it stands; the jumper stays put.
                 self._board.set(*current, empty)
                 return None, ArrivalEvent(
                     piece=interceptor.piece,
@@ -238,8 +191,8 @@ class RealTimeArbiter:
                 self._board.relocate(current, target)
                 return None, self._settle(move, target, token)
 
-        # Mid-path enemy, or a final enemy this piece may not capture (e.g. a
-        # pawn moving straight): stop short. Same settle-iff-advanced rule.
+        # Enemy mid-path, or one on the destination this piece may not take:
+        # stop short.
         if move.advanced():
             return None, self._settle(move, current, None)
         return None, None
@@ -257,11 +210,9 @@ class RealTimeArbiter:
         return replace(move, index=new_index, arrival=arrival)
 
     def _settle(self, move, cell, captured):
-        """Terminal landing on ``cell``: apply the injected promotion rule at
-        the cell's row, begin the long_rest cooldown, and emit the ArrivalEvent.
-        The piece is already physically on ``cell`` (a prior relocate put it
-        there); this only rewrites the token if it promoted. ``origin`` is the
-        move's original source; ``destination`` is where it actually stopped."""
+        """End the move on ``cell``: apply promotion, start the long rest, and
+        report the arrival. The piece is already there; this only rewrites the
+        token if it promoted."""
         row, col = cell
         piece = self._promotion_rule.promote(move.piece, row, self._board.height)
         self._board.set(row, col, piece)
@@ -275,9 +226,8 @@ class RealTimeArbiter:
         )
 
     def _jumper_on(self, cell, mover_piece):
-        """An opposing jumping piece sitting on ``cell`` (the move's final cell),
-        if any - it intercepts and captures the mover on arrival. Interception is
-        destination-only: a jumper on an intermediate cell is just a blocker."""
+        """An opposing airborne piece on ``cell``, which captures the mover on
+        arrival. Only the destination counts; a jumper mid-path merely blocks."""
         for jump in self._active_jumps:
             if jump.cell == cell and jump.piece[0] != mover_piece[0]:
                 return jump
