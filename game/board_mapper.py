@@ -1,15 +1,13 @@
 class BoardMapper:
-    """Translates pixel coordinates into board cells (Coordinate Adapter).
+    """Translates pixel coordinates into board cells.
 
-    Kept out of Board and Piece so the model stays free of pixels: only this
-    adapter knows the cell size and where the board is drawn on the canvas.
-    Returns None for a click that maps outside the board bounds.
+    The only place that knows the cell size and where the board sits on the
+    canvas, so the board and pieces stay free of pixels. Returns None for a
+    click outside the board.
 
-    `origin` is the board's top-left pixel on the canvas. It defaults to (0, 0)
-    so the text/VPL command path (whose `click x y` coordinates are board-local)
-    is unaffected; the graphical UI, which frames the board with side panels and
-    a coordinate gutter, injects the real offset so clicks still hit the cell
-    under the cursor.
+    `origin` is the board's top-left pixel. It defaults to (0, 0) for the text
+    path, whose coordinates are already board-local; the graphical UI, which
+    frames the board with panels and a gutter, injects the real offset.
     """
 
     def __init__(self, board, cell_size, origin=(0, 0)):
