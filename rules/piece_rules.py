@@ -24,15 +24,22 @@ def line_cells(start, end):
     double-step yields (mid, end) and any single/diagonal step yields (end,).
     Pure geometry: it walks the line by direction alone and reads no board
     occupancy (occupancy is judged elsewhere, at run time).
+
+    Defined only for two cells sharing a row, a column or a diagonal - the
+    shapes the sliding pieces that call it can produce. Any other pair raises
+    instead of silently returning a line that never reaches `end`. The number of
+    steps is derived from the endpoints, so the walk is bounded by construction
+    and cannot run away on a shape it does not handle.
     """
-    dr, dc = _unit_step(start, end)
-    r, c = start
-    cells = []
-    while (r, c) != end:
-        r += dr
-        c += dc
-        cells.append((r, c))
-    return tuple(cells)
+    (start_row, start_col), (end_row, end_col) = start, end
+    dr, dc = end_row - start_row, end_col - start_col
+    if dr and dc and abs(dr) != abs(dc):
+        raise ValueError(f"{start} -> {end} is neither straight nor diagonal")
+    step_row, step_col = _unit_step(start, end)
+    return tuple(
+        (start_row + step_row * step, start_col + step_col * step)
+        for step in range(1, max(abs(dr), abs(dc)) + 1)
+    )
 
 
 def path_is_clear(board, start, end):

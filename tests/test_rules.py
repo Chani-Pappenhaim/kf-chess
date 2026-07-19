@@ -171,6 +171,18 @@ def test_line_cells_matches_the_piece_path_geometry():
     assert line_cells((6, 6), (4, 6)) == PawnMovement({"w": -1, "b": 1}).path((6, 6), (4, 6))
 
 
+def test_line_cells_rejects_a_shape_that_is_no_line():
+    # A knight-shaped pair shares no row, column or diagonal, so the walk could
+    # never reach `end`. It is refused outright rather than returning a line
+    # that runs past the destination.
+    with pytest.raises(ValueError):
+        line_cells((0, 0), (2, 1))
+
+
+def test_line_cells_of_a_cell_to_itself_is_empty():
+    assert line_cells((3, 3), (3, 3)) == ()
+
+
 def test_may_capture_true_for_sliders_king_and_knight():
     # A clear-path move onto an enemy on the final cell: every non-pawn shape,
     # plus the pawn's diagonal, may take it.
