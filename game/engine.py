@@ -14,13 +14,18 @@ class GameEngine:
     motion at a time), delegating validation, starting validated motions,
     advancing time, and exposing a read-only snapshot.
 
+    What should HAPPEN when a move completes is not its business either: it
+    announces each event to its observers (see game/observers.py) without
+    knowing who they are. `move_log` and `scoreboard` are still held here, but
+    only as read handles for the view - the observers are what write to them.
+
     All collaborators are injected through the constructor - no module-level
     state, no hidden globals - so the engine is straightforward to unit test
     with fakes/stubs instead of monkeypatching.
     """
 
     def __init__(self, board, rule_engine, arbiter, win_condition, config,
-                 move_log, scoreboard, notation):
+                 move_log, scoreboard, observers=()):
         self._board = board
         self._rule_engine = rule_engine
         self._arbiter = arbiter
@@ -28,8 +33,12 @@ class GameEngine:
         self._config = config
         self._move_log = move_log
         self._scoreboard = scoreboard
-        self._notation = notation
+        self._observers = list(observers)
         self._game_over = False
+
+    def subscribe(self, observer):
+        """Register a GameObserver to receive events from here on."""
+        self._observers.append(observer)
 
     @property
     def game_over(self):
@@ -181,24 +190,15 @@ class GameEngine:
     # -- internal helpers -------------------------------------------------
 
     def _apply_events(self, events):
-        """React to arrivals reported by the arbiter: record the completed move,
-        credit a capture to the score, and let the injected WinCondition decide
-        whether that capture ends the game. The arbiter reports what happened;
-        the engine owns the running record and the game-over decision."""
+        """React to arrivals reported by the arbiter.
+
+        Anything that merely records what happened (the move log, the score, a
+        future broadcast to remote clients) is an observer's job, so the engine
+        just announces. Game over stays here: it is not a side effect but a
+        guard the engine itself enforces on every later command.
+        """
         for event in events:
-            self._record_move(event)
-            if event.captured is not None:
-                self._award_capture(event)
+            for observer in self._observers:
+                observer.on_event(event)
             if self._win_condition.is_game_over(event.captured):
                 self._game_over = True
-
-    def _record_move(self, event):
-        notation = self._notation.describe(
-            event.piece, event.origin, event.destination, event.captured
-        )
-        self._move_log.record(event.piece[0], notation, self._arbiter.clock)
-
-    def _award_capture(self, event):
-        # The arriving piece's color scores the captured piece's material value.
-        points = self._config.PIECE_VALUES.get(event.captured[1], 0)
-        self._scoreboard.award(event.piece[0], points)

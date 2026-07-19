@@ -48,8 +48,8 @@ LONG_REST_DURATION = 5000   # after a move
 SHORT_REST_DURATION = 3000  # after a jump
 
 # --- Graphical UI (assets, window, real-time loop) -------------------------
-# Only the graphics/ and ui/ layers read these; the command-script path
-# (main.run) never touches them, so the VPL grader is unaffected.
+# Only the graphics/ and ui/ layers read these; the text command-script path
+# (main.run) never touches them.
 import os
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -67,7 +67,7 @@ BOARD_PX = 8 * CELL_SIZE  # board background is rendered at 8 cells * CELL_SIZE
 # strip both above and below the board. The board's on-canvas origin is derived
 # from these, and BoardMapper/GraphicsRenderer are offset by it so clicks and
 # sprites still land on the right cell. Only the graphical path uses these; the
-# text/VPL path never offsets the board (BoardMapper defaults to origin 0,0).
+# text path never offsets the board (BoardMapper defaults to origin 0,0).
 COORD_GUTTER = 28   # strip around the board for the a-h / 1-8 labels
 PANEL_WIDTH = 250   # each side move-list panel (Black on the left, White right)
 TITLE_HEIGHT = 46   # top strip for the "Name:" title

@@ -10,20 +10,26 @@ from game.controller import Controller
 from game.move_log import MoveLog
 from game.scoreboard import Scoreboard
 from game.notation import CoordinateNotation
+from game.observers import MoveRecorder, CaptureScorer
 
 
 def make_controller(rows):
     board = Board(rows, ".")
     registry = build_default_registry(settings)
+    move_log = MoveLog()
+    scoreboard = Scoreboard(settings.COLORS)
     engine = GameEngine(
         board=board,
         rule_engine=RuleEngine(rule_registry=registry, config=settings),
         arbiter=RealTimeArbiter(board=board, promotion_rule=LastRankPromotion(settings.PAWN_DIRECTION), config=settings),
         win_condition=KingCaptureWinCondition(),
         config=settings,
-        move_log=MoveLog(),
-        scoreboard=Scoreboard(settings.COLORS),
-        notation=CoordinateNotation(board.height),
+        move_log=move_log,
+        scoreboard=scoreboard,
+        observers=(
+            MoveRecorder(move_log, CoordinateNotation(board.height)),
+            CaptureScorer(scoreboard, settings.PIECE_VALUES),
+        ),
     )
     controller = Controller(engine=engine, board_mapper=BoardMapper(board, settings.CELL_SIZE))
     return controller, engine, board

@@ -1,16 +1,15 @@
-"""Shared composition root for the KungFu Chess GameEngine.
+"""Shared composition root for the GameEngine.
 
-Single responsibility: assemble the GameEngine dependency graph in ONE place so
-the two entry points do not each duplicate it. main.py (text command-script /
-VPL grader) and play.py (graphical real-time loop) load their boards from
-different formats but wire the exact same collaborators around them - RuleEngine,
-RealTimeArbiter (with last-rank promotion), the king-capture win rule, the piece
-registry, and optionally a Controller.
+Single responsibility: assemble the dependency graph in ONE place so the two
+entry points do not each duplicate it. The text command-script (main.py) and the
+graphical real-time loop (play.py) load their boards from different formats but
+wire the exact same collaborators around them - RuleEngine, RealTimeArbiter,
+the win rule, the event observers, and optionally a Controller.
 
-Board loading is deliberately left to each entry point (text vs CSV); these
-helpers take an already-loaded board plus the registry that loaded it and build
-everything else. The registry is exposed on its own because it is needed twice:
-once to LOAD/validate the board and once inside the RuleEngine.
+Board loading is deliberately left to each entry point; these helpers take an
+already-loaded board plus the registry that loaded it and build everything else.
+The registry is exposed on its own because it is needed twice: once to
+LOAD/validate the board and once inside the RuleEngine.
 """
 from __future__ import annotations
 
@@ -24,6 +23,7 @@ from game.controller import Controller
 from game.move_log import MoveLog
 from game.scoreboard import Scoreboard
 from game.notation import CoordinateNotation
+from game.observers import MoveRecorder, CaptureScorer
 
 
 def build_registry(config):
@@ -40,22 +40,30 @@ def build_engine(board, registry, config):
     """Wire the GameEngine around an already-loaded board.
 
     Assembles the RealTimeArbiter (owning motion and last-rank promotion), the
-    RuleEngine (legality against `registry`), and the king-capture win rule.
+    RuleEngine (legality against `registry`), the king-capture win rule, and the
+    observers that react to completed moves. The log and the scoreboard are
+    created here once and handed to both sides: to an observer that writes to
+    them, and to the engine that exposes them for reading.
     """
     arbiter = RealTimeArbiter(
         board=board,
         promotion_rule=LastRankPromotion(config.PAWN_DIRECTION),
         config=config,
     )
+    move_log = MoveLog()
+    scoreboard = Scoreboard(config.COLORS)
     return GameEngine(
         board=board,
         rule_engine=RuleEngine(rule_registry=registry, config=config),
         arbiter=arbiter,
         win_condition=KingCaptureWinCondition(),
         config=config,
-        move_log=MoveLog(),
-        scoreboard=Scoreboard(config.COLORS),
-        notation=CoordinateNotation(board.height),
+        move_log=move_log,
+        scoreboard=scoreboard,
+        observers=(
+            MoveRecorder(move_log, CoordinateNotation(board.height)),
+            CaptureScorer(scoreboard, config.PIECE_VALUES),
+        ),
     )
 
 
@@ -65,8 +73,8 @@ def build_game(board, registry, config, board_origin=(0, 0)):
     The full graph for an interactive entry point: returns the engine and a
     Controller that turns pixel clicks/jumps into engine commands. `board_origin`
     is the board's top-left pixel on the canvas; it defaults to (0, 0) for the
-    text/VPL path (board-local click coordinates) and is set by the graphical
-    entry point to the framed board's offset.
+    text path (board-local click coordinates) and is set by the graphical entry
+    point to the framed board's offset.
     """
     engine = build_engine(board, registry, config)
     controller = Controller(engine, BoardMapper(board, config.CELL_SIZE, board_origin))

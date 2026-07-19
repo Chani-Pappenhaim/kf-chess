@@ -13,6 +13,7 @@ from game.engine import GameEngine
 from game.move_log import MoveLog
 from game.scoreboard import Scoreboard
 from game.notation import CoordinateNotation
+from game.observers import GameObserver, MoveRecorder, CaptureScorer
 from rules.reasons import Reason
 from view.renderer import BoardRenderer
 
@@ -55,15 +56,20 @@ def make_engine(rows, win_condition=None, promotion_rule=None, config=settings):
         promotion_rule=promotion_rule or LastRankPromotion(config.PAWN_DIRECTION),
         config=config,
     )
+    move_log = MoveLog()
+    scoreboard = Scoreboard(config.COLORS)
     engine = GameEngine(
         board=board,
         rule_engine=RuleEngine(rule_registry=registry, config=config),
         arbiter=arbiter,
         win_condition=win_condition or KingCaptureWinCondition(),
         config=config,
-        move_log=MoveLog(),
-        scoreboard=Scoreboard(config.COLORS),
-        notation=CoordinateNotation(board.height),
+        move_log=move_log,
+        scoreboard=scoreboard,
+        observers=(
+            MoveRecorder(move_log, CoordinateNotation(board.height)),
+            CaptureScorer(scoreboard, config.PIECE_VALUES),
+        ),
     )
     return engine, board
 
@@ -348,6 +354,26 @@ def test_completed_move_is_recorded_in_the_move_log():
     assert entries[0].notation == "Ra3-c3"
     assert entries[0].color == "w"
     assert entries[0].time_ms == 2 * settings.MOVE_DURATION
+
+
+def test_a_subscribed_observer_receives_completed_moves():
+    # The extension point: a new consumer attaches without the engine knowing
+    # anything about it.
+    seen = []
+
+    class Spy(GameObserver):
+        def on_event(self, event):
+            seen.append(event)
+
+    engine, _ = make_engine([["wR", ".", "bP"], [".", ".", "."], [".", ".", "."]])
+    engine.subscribe(Spy())
+    engine.request_move((0, 0), (0, 2))
+    engine.wait(2 * settings.MOVE_DURATION)
+
+    assert len(seen) == 1
+    assert seen[0].destination == (0, 2)
+    assert seen[0].captured == "bP"
+    assert seen[0].at_ms == 2 * settings.MOVE_DURATION
 
 
 def test_capture_is_recorded_with_x_and_awards_material():

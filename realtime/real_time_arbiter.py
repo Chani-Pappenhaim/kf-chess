@@ -16,12 +16,15 @@ class ArrivalEvent:
     `origin` is the move's ORIGINAL source (notation "from" - the board has
     already cleared it), and `destination` is where the move actually stopped
     (which may be short of the requested target if it was blocked in flight).
+    `at_ms` is the simulated clock when it happened, carried on the event itself
+    so an observer (or a remote client) never needs a second source for "when".
     """
 
     piece: str
     origin: tuple
     destination: tuple
     captured: str | None
+    at_ms: int = 0
 
 
 class RealTimeArbiter:
@@ -229,6 +232,7 @@ class RealTimeArbiter:
                     origin=interceptor.cell,
                     destination=interceptor.cell,
                     captured=move.piece,
+                    at_ms=self._clock,
                 )
             if move.may_capture_final:
                 self._board.relocate(current, target)
@@ -260,7 +264,13 @@ class RealTimeArbiter:
         piece = self._promotion_rule.promote(move.piece, row, self._board.height)
         self._board.set(row, col, piece)
         self._begin_cooldown(cell, "long_rest", self._config.LONG_REST_DURATION)
-        return ArrivalEvent(piece=piece, origin=move.source, destination=cell, captured=captured)
+        return ArrivalEvent(
+            piece=piece,
+            origin=move.source,
+            destination=cell,
+            captured=captured,
+            at_ms=self._clock,
+        )
 
     def _jumper_on(self, cell, mover_piece):
         """An opposing jumping piece sitting on ``cell`` (the move's final cell),
