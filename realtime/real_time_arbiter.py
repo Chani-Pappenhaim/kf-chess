@@ -209,7 +209,7 @@ class RealTimeArbiter:
             self._board.relocate(current, target)
             if target == move.final:
                 return None, self._settle(move, target, None)
-            return self._advanced(move), None
+            return self._stepped(move), None
 
         # N same colour: stop. Settle on the current cell iff we ever advanced;
         # a move blocked at its very first step leaves no trace at all.
@@ -244,10 +244,12 @@ class RealTimeArbiter:
             return None, self._settle(move, current, None)
         return None, None
 
-    def _advanced(self, move):
-        """The move's next state after committing one empty cell: index bumped,
-        and the following step's arrival scheduled off THIS step's arrival (not
-        the live clock) so a long slide accumulates no drift."""
+    def _stepped(self, move):
+        """The move's next state after committing one empty cell.
+
+        The following step is scheduled off THIS step's arrival rather than the
+        live clock, so a long slide accumulates no drift.
+        """
         new_index = move.index + 1
         new_current = move.path[new_index - 1]
         next_cell = move.path[new_index]

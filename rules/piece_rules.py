@@ -14,14 +14,7 @@ def _unit_step(start, end):
 
 
 def line_cells(start, end):
-    """The cells from the square after `start` up to and including `end`, one
-    unit at a time along the line between them. A straight double-step gives
-    (mid, end); a single or diagonal step gives (end,).
-
-    Defined only for two cells sharing a row, a column or a diagonal; any other
-    pair raises rather than returning a line that never reaches `end`. The step
-    count comes from the endpoints, so the walk is bounded by construction.
-    """
+    """The cells on the straight line from start to end, including the end but not the start. Raises ValueError if the line is not straight or diagonal."""
     (start_row, start_col), (end_row, end_col) = start, end
     dr, dc = end_row - start_row, end_col - start_col
     if dr and dc and abs(dr) != abs(dc):
