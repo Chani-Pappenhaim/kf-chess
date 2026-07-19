@@ -12,9 +12,8 @@ if TYPE_CHECKING:
 class MoveContext:
     """Everything a movement strategy needs to judge a move, bundled up.
 
-    Keeping this as one immutable object (instead of passing five loose
-    parameters around) is what lets new piece kinds be registered without
-    changing every call site.
+    One immutable object rather than five loose parameters, so a strategy that
+    needs more context does not change every signature along the way.
     """
 
     board: Board
@@ -25,11 +24,10 @@ class MoveContext:
 
 
 class MovementStrategy(ABC):
-    """A single piece kind's movement rule (Strategy pattern).
+    """One piece kind's movement rule.
 
-    New piece kinds - including custom, non-standard ones - are supported
-    simply by implementing this interface and registering an instance with
-    a PieceRuleRegistry. No engine or parser code needs to change.
+    A kind is added by implementing this interface and registering an instance
+    with a PieceRuleRegistry; nothing else branches on the piece letter.
     """
 
     @abstractmethod
@@ -38,12 +36,11 @@ class MovementStrategy(ABC):
 
     def path(self, start, end):
         """The cells this piece steps through to reach `end`, excluding the
-        source and including the destination. Pure geometry: it never reads
-        board occupancy (that is judged at run time as the arbiter walks it).
+        source and including the destination. Pure geometry - occupancy is
+        judged later, as the piece actually walks it.
 
-        The atomic default is a single leap `(end,)` — no intermediate cells —
-        which is exactly right for King and Knight (a knight's L-jump has no
-        squares to pass through). Sliding pieces (Rook/Bishop/Queen/Pawn)
-        override this to return the full line between the endpoints.
+        The default is a single leap `(end,)` with no intermediate cells, which
+        is what a king or a knight does. Sliding pieces override it with the
+        full line between the endpoints.
         """
         return (end,)

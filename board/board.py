@@ -1,16 +1,10 @@
 class Board:
-    """The single in-memory board that all game logic works with: a grid of
-    string tokens (e.g. 'wK', '.').
+    """The board every other layer works with: a grid of string tokens
+    ('wK', 'bP', '.'), where a token is the color followed by the piece kind.
 
-    There is deliberately one internal representation. Support for other
-    *input* formats (binary, FEN, ...) is not added by subclassing this
-    class, but by writing a loader that converts the external format into a
-    Board (see board/loaders.py). That keeps the variation at the input
-    boundary - where it actually lives - so no game-logic module changes when
-    a new input format is supported; only a new loader is written.
-
-    Internal storage (`_cells`) is a private implementation detail: nothing
-    outside this class touches it directly.
+    This is the one internal representation. Other input formats are handled by
+    loaders that convert them into a Board (see board/loaders.py), not by
+    subclassing. The grid itself is private; callers go through the methods.
     """
 
     def __init__(self, rows, empty_token):
@@ -40,20 +34,12 @@ class Board:
         return self._cells[row][col] == self._empty_token
 
     def relocate(self, src, dst):
-        """The single named write for a piece that is moving: pick the token up
-        off `src` and put it down on `dst`, then leave `src` empty.
+        """Move the token on `src` to `dst`, leaving `src` empty.
 
-        Deliberately DUMB and single-purpose. It always overwrites whatever sits
-        on `dst` and reports nothing about it - it does NOT read the destination,
-        does NOT tell anyone a capture happened, and does NOT apply promotion.
-        The arbiter is the one that owns those decisions: it reads `dst` (for a
-        capture) BEFORE calling this, and applies promotion at the settle cell
-        AFTER. Routing every moving-piece mutation through this one method keeps
-        the "move a token across the board" write in exactly one place, so no
-        caller ever hand-rolls a set()+clear() pair (and risks forgetting the
-        clear, or ordering src/dst wrong when src == dst-adjacent).
-
-        `src` and `dst` are (row, col) tuples.
+        Every piece that moves goes through here, so the pick-up-and-clear pair
+        is written once. It overwrites whatever sits on `dst` without reading
+        it: noticing a capture and applying promotion belong to the caller.
+        Both cells are (row, col) tuples.
         """
         sr, sc = src
         dr, dc = dst
@@ -61,6 +47,6 @@ class Board:
         self._cells[sr][sc] = self._empty_token
 
     def snapshot(self):
-        """Return a read-only copy of the grid for rendering, so callers can
-        never mutate the board through the value they get back."""
+        """A copy of the grid for rendering, so the caller cannot mutate the
+        board through what it gets back."""
         return [row.copy() for row in self._cells]

@@ -2,7 +2,7 @@ from enum import Enum
 
 
 class Reason(str, Enum):
-    """Reasons for a move to be rejected."""
+    """Outcome of a requested move: accepted, or why it was refused."""
 
     OK = "ok"
 
