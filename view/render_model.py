@@ -1,10 +1,9 @@
-"""RenderModel - the read-only view model for the graphical UI.
+"""The read-only view model for the graphical UI.
 
-Richer sibling of GameSnapshot: instead of just the logical grid it carries,
-per piece, the animation/domain state and any in-flight motion, so the renderer
-can pick the right sprite and interpolate a sliding piece without ever touching
-the live Board or arbiter. Like GameSnapshot it is an immutable DTO - exactly
-what a future networked server would serialise and send to a thin client.
+A richer sibling of GameSnapshot: it carries each piece's animation state and
+any motion in progress, so the renderer can pick a sprite and interpolate a
+sliding piece without touching the live model. A frozen DTO, like a server would
+send a client.
 """
 from __future__ import annotations
 
