@@ -1,17 +1,15 @@
-"""Window - the cv2 window + input adapter.
+"""Window - the cv2 window and input adapter.
 
-One of the graphics/ modules that import cv2 (alongside Img and the asset
-loader). Drawing never happens here: a
-fully composed canvas Img is handed to show(). Presentation and input sit in
-one class because cv2 binds them to a single window handle - waitKey both
-refreshes the imshow buffer and returns keystrokes, and the mouse callback is
-registered per window - so splitting them would only share that handle around.
+Drawing never happens here; a fully composed canvas is handed to show().
+Presentation and input share one class because cv2 ties them to a single window:
+waitKey both refreshes the display and returns keystrokes, and the mouse callback
+is registered per window.
 
-Raw device events are returned as small tuples for the input layer to
-translate; Window itself decides no game semantics:
-    ("left",   x, y)   left mouse button pressed at pixel (x, y)
-    ("double", x, y)   left mouse button double-clicked
-    ("quit",)          ESC / q pressed, or the window was closed
+Raw device events are returned as small tuples for the input layer to translate;
+Window decides no game meaning:
+    ("left",   x, y)   left button pressed at pixel (x, y)
+    ("double", x, y)   left button double-clicked
+    ("quit",)          ESC / q pressed, or the window closed
 """
 from __future__ import annotations
 
