@@ -5,22 +5,14 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class GameSnapshot:
-    """Read-only view of the game state handed to the renderer.
+    """A frozen copy of the board handed to the renderer, so the view can never
+    mutate the live model."""
 
-    The renderer never receives the live Board or Piece objects - only this
-    immutable snapshot - so the view layer cannot accidentally mutate the
-    model. `cells` is the logical board (a tuple of tuples of tokens).
-
-    `selected` is part of the shape (a graphical renderer highlights it) but is
-    populated only by whoever owns selection state; the engine leaves it None,
-    since `print board` never shows selection.
-    """
-
-    cells: tuple
+    cells: tuple                   # tuple of tuples of tokens
     width: int
     height: int
     game_over: bool
-    selected: tuple | None = None
+    selected: tuple | None = None  # a cell to highlight, set only by whoever owns selection
 
     @classmethod
     def from_board(cls, board, game_over, selected=None):
