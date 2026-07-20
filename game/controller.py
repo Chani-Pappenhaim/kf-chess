@@ -48,8 +48,7 @@ class Controller:
         self._resolve_selection(result, cell)
 
     def jump(self, x, y):
-        # A jump always ends any pending selection first (matches the engine's
-        # historical order: selection is cleared before the jump is attempted).
+        # A jump ends any pending selection first.
         self._selected = None
         cell = self._mapper.pixel_to_cell(x, y)
         if cell is None:
