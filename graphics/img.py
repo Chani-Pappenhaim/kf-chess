@@ -1,66 +1,18 @@
-"""Img - the sanctioned graphics primitive (vendored, unmodified).
+"""Img - the drawing primitive: composes images and text onto a canvas.
 
-Source: KamaTechOrg/CTD26 (py/img.py) - https://github.com/KamaTechOrg/CTD26
-This is the attached library the assignment mandates: all on-screen drawing
-must go through this class. It wraps OpenCV; keeping it here means cv2 lives
-only in the graphics/ package (Img, graphics/window.py for the window + input,
-and graphics/assets.py for loading sprites) - all on-screen drawing goes through
-Img.
+Composition only. Loading images from disk is assets.py's job and presenting a
+canvas on screen is window.py's, so each graphics concern has one owner. `img`
+is a BGRA numpy array; draw_on alpha-blends this image onto another at a given
+position, which is how the whole frame is assembled layer by layer.
 """
 from __future__ import annotations
 
-import pathlib
-
 import cv2
-import numpy as np
+
 
 class Img:
     def __init__(self):
         self.img = None
-
-    def read(self, path: str | pathlib.Path,
-             size: tuple[int, int] | None = None,
-             keep_aspect: bool = False,
-             interpolation: int = cv2.INTER_AREA) -> "Img":
-        """
-        Load `path` into self.img and **optionally resize**.
-
-        Parameters
-        ----------
-        path : str | Path
-            Image file to load.
-        size : (width, height) | None
-            Target size in pixels.  If None, keep original.
-        keep_aspect : bool
-            • False  → resize exactly to `size`
-            • True   → shrink so the *longer* side fits `size` while
-                       preserving aspect ratio (no cropping).
-        interpolation : OpenCV flag
-            E.g.  `cv2.INTER_AREA` for shrink, `cv2.INTER_LINEAR` for enlarge.
-
-        Returns
-        -------
-        Img
-            `self`, so you can chain:  `sprite = Img().read("foo.png", (64,64))`
-        """
-        path = str(path)
-        self.img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
-        if self.img is None:
-            raise FileNotFoundError(f"Cannot load image: {path}")
-
-        if size is not None:
-            target_w, target_h = size
-            h, w = self.img.shape[:2]
-
-            if keep_aspect:
-                scale = min(target_w / w, target_h / h)
-                new_w, new_h = int(w * scale), int(h * scale)
-            else:
-                new_w, new_h = target_w, target_h
-
-            self.img = cv2.resize(self.img, (new_w, new_h), interpolation=interpolation)
-
-        return self
 
     def draw_on(self, other_img, x, y):
         if self.img is None or other_img.img is None:
@@ -94,10 +46,3 @@ class Img:
         cv2.putText(self.img, txt, (x, y),
                     cv2.FONT_HERSHEY_SIMPLEX, font_size,
                     color, thickness, cv2.LINE_AA)
-
-    def show(self):
-        if self.img is None:
-            raise ValueError("Image not loaded.")
-        cv2.imshow("Image", self.img)
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
