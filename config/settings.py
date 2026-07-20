@@ -47,6 +47,11 @@ ALLOW_CONCURRENT_MOVES = True
 LONG_REST_DURATION = 5000   # after a move
 SHORT_REST_DURATION = 3000  # after a jump
 
+# Names of the two rest states, shared by the arbiter that emits them, the view
+# that veils a resting piece, and the sprite folder for each rest animation.
+LONG_REST_STATE = "long_rest"
+SHORT_REST_STATE = "short_rest"
+
 # --- Graphical UI (assets, window, real-time loop) -------------------------
 # Only the graphics/ and ui/ layers read these; the text command-script path
 # (main.run) never touches them.

@@ -28,6 +28,10 @@ def test_run_accepts_injected_config(capsys):
         EMPTY_CELL=".",
         ALLOW_CONCURRENT_MOVES=False,
         PIECE_VALUES={"P": 1, "K": 0},
+        LONG_REST_DURATION=0,
+        SHORT_REST_DURATION=0,
+        LONG_REST_STATE="long_rest",
+        SHORT_REST_STATE="short_rest",
     )
     lines = ["Board:", "wK . bK", "Commands:", "print"]
     main_module.run(lines, config=custom_config)

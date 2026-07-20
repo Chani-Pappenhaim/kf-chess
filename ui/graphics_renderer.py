@@ -9,6 +9,7 @@ through Img.draw_on.
 """
 from __future__ import annotations
 
+from config import settings
 from graphics.assets import solid
 from graphics.img import Img
 
@@ -16,7 +17,7 @@ _HIGHLIGHT_COLOR = (0, 255, 0, 90)   # translucent green (BGRA) - selection
 _RESTING_COLOR = (0, 0, 255, 110)    # translucent red (BGRA) - cooldown
 _MOVE_HINT_COLOR = (60, 60, 60, 110)     # translucent dark dot - a reachable empty square
 _CAPTURE_HINT_COLOR = (60, 60, 210, 120)  # translucent red tint - a capturable square
-_RESTING_STATES = ("short_rest", "long_rest")
+_RESTING_STATES = (settings.SHORT_REST_STATE, settings.LONG_REST_STATE)
 _HOP_HEIGHT_RATIO = 0.5              # peak jump lift, as a fraction of a cell
 _MOVE_HINT_RATIO = 0.3              # move-hint dot size, as a fraction of a cell
 

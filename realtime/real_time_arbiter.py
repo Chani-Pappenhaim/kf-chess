@@ -216,7 +216,7 @@ class RealTimeArbiter:
         row, col = cell
         piece = self._promotion_rule.promote(move.piece, row, self._board.height)
         self._board.set(row, col, piece)
-        self._begin_cooldown(cell, "long_rest", self._config.LONG_REST_DURATION)
+        self._begin_cooldown(cell, self._config.LONG_REST_STATE, self._config.LONG_REST_DURATION)
         return ArrivalEvent(
             piece=piece,
             origin=move.source,
@@ -240,7 +240,7 @@ class RealTimeArbiter:
                 airborne.append(jump)
             else:
                 # A completed jump settles into a short rest on its cell.
-                self._begin_cooldown(jump.cell, "short_rest", self._config.SHORT_REST_DURATION)
+                self._begin_cooldown(jump.cell, self._config.SHORT_REST_STATE, self._config.SHORT_REST_DURATION)
         self._active_jumps = airborne
 
     def _begin_cooldown(self, cell, rest_state, duration):
