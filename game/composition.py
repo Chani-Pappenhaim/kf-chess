@@ -1,15 +1,9 @@
-"""Shared composition root for the GameEngine.
+"""The one place the whole dependency graph is wired.
 
-Single responsibility: assemble the dependency graph in ONE place so the two
-entry points do not each duplicate it. The text command-script (main.py) and the
-graphical real-time loop (play.py) load their boards from different formats but
-wire the exact same collaborators around them - RuleEngine, RealTimeArbiter,
-the win rule, the event observers, and optionally a Controller.
-
-Board loading is deliberately left to each entry point; these helpers take an
-already-loaded board plus the registry that loaded it and build everything else.
-The registry is exposed on its own because it is needed twice: once to
-LOAD/validate the board and once inside the RuleEngine.
+Both entry points load their board from a different format, then hand it here to
+build everything else, so the wiring lives once instead of in each of them. The
+registry is built separately because it is needed both to load the board and
+inside the RuleEngine.
 """
 from __future__ import annotations
 
@@ -27,23 +21,16 @@ from game.observers import MoveRecorder, CaptureScorer
 
 
 def build_registry(config):
-    """The piece-rule registry the whole graph shares.
-
-    Callers build it first, use it to load/validate their board (text or CSV),
-    then pass it back into build_engine/build_game so the RuleEngine validates
-    against the same piece set the board was parsed with.
-    """
+    """The piece-rule registry the whole graph shares. Built first, used to load
+    the board, then passed back in so the RuleEngine validates against it too."""
     return build_default_registry(config)
 
 
 def build_engine(board, registry, config):
     """Wire the GameEngine around an already-loaded board.
 
-    Assembles the RealTimeArbiter (owning motion and last-rank promotion), the
-    RuleEngine (legality against `registry`), the king-capture win rule, and the
-    observers that react to completed moves. The log and the scoreboard are
-    created here once and handed to both sides: to an observer that writes to
-    them, and to the engine that exposes them for reading.
+    The log and the scoreboard are built here once and handed to both sides: to
+    an observer that writes to them, and to the engine that exposes them to read.
     """
     arbiter = RealTimeArbiter(
         board=board,
@@ -68,13 +55,10 @@ def build_engine(board, registry, config):
 
 
 def build_game(board, registry, config, board_origin=(0, 0)):
-    """build_engine plus a Controller wired with a BoardMapper.
+    """build_engine plus a Controller, for an entry point that takes input.
 
-    The full graph for an interactive entry point: returns the engine and a
-    Controller that turns pixel clicks/jumps into engine commands. `board_origin`
-    is the board's top-left pixel on the canvas; it defaults to (0, 0) for the
-    text path (board-local click coordinates) and is set by the graphical entry
-    point to the framed board's offset.
+    `board_origin` is the board's top-left pixel: (0, 0) for the text path, the
+    framed offset for the graphical one, so clicks resolve to the right cell.
     """
     engine = build_engine(board, registry, config)
     controller = Controller(engine, BoardMapper(board, config.CELL_SIZE, board_origin))
