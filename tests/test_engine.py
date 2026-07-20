@@ -13,6 +13,7 @@ from game.engine import GameEngine
 from game.move_log import MoveLog
 from game.scoreboard import Scoreboard
 from game.notation import CoordinateNotation
+from game.models import JumpEvent
 from game.observers import GameObserver, MoveRecorder, CaptureScorer
 from rules.reasons import Reason
 from view.renderer import BoardRenderer
@@ -374,6 +375,25 @@ def test_a_subscribed_observer_receives_completed_moves():
     assert seen[0].destination == (0, 2)
     assert seen[0].captured == "bP"
     assert seen[0].at_ms == 2 * settings.MOVE_DURATION
+
+
+def test_a_jump_announces_a_jump_event_immediately():
+    # A jump is reported the instant it is accepted, not on landing, so a
+    # listener (e.g. a sound) reacts at take-off.
+    seen = []
+
+    class Spy(GameObserver):
+        def on_event(self, event):
+            seen.append(event)
+
+    engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
+    engine.subscribe(Spy())
+    engine.request_jump((0, 0))
+
+    assert len(seen) == 1
+    assert isinstance(seen[0], JumpEvent)
+    assert seen[0].piece == "wR"
+    assert seen[0].cell == (0, 0)
 
 
 def test_capture_is_recorded_with_x_and_awards_material():

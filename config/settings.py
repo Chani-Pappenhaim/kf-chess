@@ -65,6 +65,14 @@ BOARD_CSV = os.path.join(ASSETS_ROOT, "board.csv")
 
 WINDOW_TITLE = "KungFu Chess"
 FPS = 60
+
+# Sound effects (graphical UI only). A missing file is silently skipped.
+SOUNDS_ROOT = os.path.join(ASSETS_ROOT, "sounds")
+SOUND_ENABLED = True
+MOVE_SOUND = os.path.join(SOUNDS_ROOT, "move.wav")          # a move settled
+CAPTURE_SOUND = os.path.join(SOUNDS_ROOT, "capture.wav")    # a move captured
+JUMP_SOUND = os.path.join(SOUNDS_ROOT, "jump.wav")          # a piece jumped
+GAME_OVER_SOUND = os.path.join(SOUNDS_ROOT, "game_over.wav")  # the king was taken
 BOARD_PX = 8 * CELL_SIZE  # board background is rendered at 8 cells * CELL_SIZE
 
 # Full-window layout: the board sits framed by a coordinate gutter (file/rank

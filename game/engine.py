@@ -1,4 +1,4 @@
-from game.models import MoveResult
+from game.models import MoveResult, JumpEvent
 from rules.reasons import Reason
 from view.snapshot import GameSnapshot
 from view.render_model import RenderModel, RenderPiece
@@ -123,7 +123,9 @@ class GameEngine:
         if self._board.is_empty(*cell):
             return MoveResult(False, Reason.EMPTY_CELL)
 
-        self._arbiter.start_jump(self._board.get(*cell), cell)
+        piece = self._board.get(*cell)
+        self._arbiter.start_jump(piece, cell)
+        self._apply_events([JumpEvent(piece, cell, self._arbiter.clock)])
         return MoveResult(True, Reason.OK)
 
     def wait(self, dt):

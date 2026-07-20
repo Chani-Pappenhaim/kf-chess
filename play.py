@@ -13,6 +13,8 @@ from game.composition import (
     build_engine as _build_engine,
     build_game as _build_game,
 )
+from audio.player import AudioPlayer
+from game.observers import SoundPlayer
 from graphics.assets import AssetLoader, read_image, solid
 from graphics.window import Window
 from ui.game_loop import GameLoop
@@ -67,6 +69,7 @@ def run(config=settings):  # pragma: no cover - real-time GUI loop
     """Build and wire every component, then hand them to the GameLoop."""
     window = Window(config.WINDOW_TITLE)
     engine, controller = build_game(config)
+    engine.subscribe(SoundPlayer(AudioPlayer(), config))
     translator = InputTranslator(controller)
     sprites = AssetLoader(config).load_sprite_library()
     origin = (config.BOARD_ORIGIN_X, config.BOARD_ORIGIN_Y)

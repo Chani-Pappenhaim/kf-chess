@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from game.models import JumpEvent
+
 
 class GameObserver(ABC):
     """Receives game events as they occur."""
@@ -29,6 +31,8 @@ class MoveRecorder(GameObserver):
         self._notation = notation
 
     def on_event(self, event):
+        if isinstance(event, JumpEvent):
+            return                          # a jump is not a move
         text = self._notation.describe(
             event.piece, event.origin, event.destination, event.captured
         )
@@ -47,3 +51,25 @@ class CaptureScorer(GameObserver):
             return
         points = self._piece_values.get(event.captured[1], 0)
         self._scoreboard.award(event.piece[0], points)
+
+
+class SoundPlayer(GameObserver):
+    """Plays a sound for each action, through an injected audio player."""
+
+    def __init__(self, audio, config):
+        self._audio = audio
+        self._config = config
+
+    def on_event(self, event):
+        if not self._config.SOUND_ENABLED:
+            return
+        self._audio.play(self._sound_for(event))
+
+    def _sound_for(self, event):
+        if isinstance(event, JumpEvent):
+            return self._config.JUMP_SOUND
+        if event.captured is None:
+            return self._config.MOVE_SOUND
+        if event.captured[1] == "K":
+            return self._config.GAME_OVER_SOUND
+        return self._config.CAPTURE_SOUND
