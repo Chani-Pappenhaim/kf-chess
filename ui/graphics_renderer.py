@@ -103,11 +103,11 @@ class GraphicsRenderer:
         return int(self._hop_height * 4 * progress * (1 - progress))
 
     def _current_cell(self, piece):
-        """The (possibly fractional) cell to draw at: the destination when
-        still, or a point interpolated from origin while a move is in flight."""
-        if piece.origin is None or piece.progress <= 0:
+        """The (possibly fractional) cell to draw at: the piece's own cell when
+        still, or a point interpolated towards `target` while a step is due."""
+        if piece.target is None or piece.progress <= 0:
             return piece.cell
-        (start_r, start_c), (end_r, end_c) = piece.origin, piece.cell
+        (start_r, start_c), (end_r, end_c) = piece.cell, piece.target
         return (
             start_r + (end_r - start_r) * piece.progress,
             start_c + (end_c - start_c) * piece.progress,

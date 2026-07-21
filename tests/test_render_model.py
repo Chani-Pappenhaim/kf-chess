@@ -40,11 +40,11 @@ def test_render_model_marks_a_moving_piece_with_progress():
     engine = play.build_engine(settings)
     engine.request_move((6, 0), (5, 0))  # a one-step pawn move
     engine.wait(settings.MOVE_DURATION // 2)
-    mover = [piece for piece in engine.render_model().pieces if piece.origin == (6, 0)]
+    mover = [piece for piece in engine.render_model().pieces if piece.state == "move"]
     assert len(mover) == 1
     piece = mover[0]
-    assert piece.state == "move"
-    assert piece.cell == (5, 0)
+    assert piece.cell == (6, 0)     # still on the square it is stepping off
+    assert piece.target == (5, 0)   # sliding towards the next one
     assert 0 < piece.progress < 1
 
 

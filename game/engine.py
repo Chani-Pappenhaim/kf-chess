@@ -164,16 +164,16 @@ class GameEngine:
         )
 
     def _render_piece(self, token, cell, motions):
-        # An in-flight piece still sits on its source cell on the board; render
-        # it sliding towards its destination. A jumping piece stays put but plays
+        # An in-flight piece occupies the cell it has stepped onto so far, and
+        # is sliding towards the next one. A jumping piece stays put but plays
         # its jump animation. Otherwise the piece is idle.
         motion = motions.get(cell)
         if motion is not None:
             return RenderPiece(
                 token=token,
-                cell=motion.end,
+                cell=cell,
                 state="move",
-                origin=cell,
+                target=motion.end,
                 progress=motion.progress,
             )
         if self._arbiter.is_jumping_on(cell):

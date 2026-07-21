@@ -49,7 +49,7 @@ def test_still_piece_is_centered_in_its_cell():
 
 def test_moving_piece_is_interpolated_between_cells():
     # halfway from col 0 to col 2 -> col 1.0; full-cell sprite -> x = 100, y = 0.
-    piece = RenderPiece("wP", (0, 2), state="move", origin=(0, 0), progress=0.5)
+    piece = RenderPiece("wP", (0, 0), state="move", target=(0, 2), progress=0.5)
     assert _render(100, 100, piece) == [(100, 0)]
 
 

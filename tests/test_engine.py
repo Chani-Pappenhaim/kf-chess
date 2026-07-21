@@ -372,6 +372,23 @@ def subscribe_all(bus):
     return seen
 
 
+def test_a_moving_piece_is_listed_on_the_cell_it_occupies():
+    # Mid-move, with the mover one step short of an enemy: it must be listed on
+    # the square it has reached, not on the one it is heading into - otherwise
+    # two pieces would share a cell and occupancy could not be read off the
+    # model at all.
+    engine, _ = make_engine([["wR", ".", "bP"], [".", ".", "."], [".", ".", "."]])
+    engine.request_move((0, 0), (0, 2))
+    engine.wait(settings.MOVE_DURATION + settings.MOVE_DURATION // 2)
+
+    pieces = engine.render_model().pieces
+    cells = [piece.cell for piece in pieces]
+    assert sorted(cells) == [(0, 1), (0, 2)]
+    assert len(cells) == len(set(cells))
+    mover = next(piece for piece in pieces if piece.state == "move")
+    assert (mover.cell, mover.target) == ((0, 1), (0, 2))
+
+
 def test_a_completed_move_is_published():
     # The extension point: a new consumer attaches without the engine knowing
     # anything about it.
