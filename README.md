@@ -28,9 +28,16 @@ view/      snapshot.py            - GameSnapshot (read-only text view model)
 graphics/  img.py, window.py      - cv2 adapters (Img = drawing primitive; Window = window + input)
            assets.py, sprite*.py  - Unicode-safe loading, AssetLoader, SpriteAnimation/Library
 ui/        graphics_renderer.py   - RenderModel -> canvas via Img (+ selection highlight)
-           hud.py                 - score / clock / game-over overlays
+           hud.py, animation.py   - score / clock overlays; start & win banner
            input_source.py        - InputTranslator (device event -> Controller)
-gateway/   gateway.py             - GameGateway Protocol + NetworkGateway stub (networked future)
+           composition.py         - the one place the graphical UI is wired (shared)
+events/    bus.py                 - EventBus: publish/subscribe by exact event type
+audio/     player.py, cues.py     - winsound shell; one sound per event, off the bus
+gateway/   gateway.py             - GameGateway Protocol (engine and network proxy alike)
+protocol/  commands/state/events  - pure translation of what crosses the wire (no I/O)
+           messages.py            - the JSON envelope the two sides speak
+server/    broadcast/handler/...  - what turns the game into a service; owns the clock
+client/    gateway/inbox/router   - a window with no game inside it, draws what it is sent
 tests/     test_*.py              - unit tests (pytest)
 main.py    text command-script entry (VPL / grader)
 play.py    graphical real-time entry: `python play.py`
@@ -39,9 +46,12 @@ play.py    graphical real-time entry: `python play.py`
 ## Running
 
 - **Command script (text / VPL):** `python main.py < script.txt`
-- **Graphical real-time game:** `pip install -r requirements.txt` then
-  `python play.py`. Left-click a piece then a target to move, right-click to
+- **Graphical real-time game (local):** `pip install -r requirements.txt` then
+  `python play.py`. Left-click a piece then a target to move, double-click to
   jump, ESC/q to quit. See [docs/UI_ARCHITECTURE.md](docs/UI_ARCHITECTURE.md).
+- **Over a network:** `python -m server` runs the authoritative game; each
+  `python -m client` opens a window that plays against it, and several clients
+  share one game.
 
 ## Layers and responsibilities
 

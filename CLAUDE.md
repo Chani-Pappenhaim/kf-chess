@@ -17,10 +17,13 @@ requirements.
 - **Run the text command-script (what VPL grades):** `python main.py < script.txt`
   — reads a `Board:` / `Commands:` script from stdin, executes `click x y`,
   `jump x y`, `wait ms`, `print board`, and prints the canonical board.
-- **Run the graphical real-time game:** `pip install -r requirements.txt` then
-  `python play.py` (opencv window; left-click a piece then a target to move,
-  right-click to jump, ESC/q to quit).
-- **Tests:** `pytest` (201 tests). Single file: `pytest tests/test_engine.py`.
+- **Run the graphical real-time game (local):** `pip install -r requirements.txt`
+  then `python play.py` (opencv window; left-click a piece then a target to move,
+  double-click to jump, ESC/q to quit).
+- **Run it over a network:** `python -m server` starts the authoritative game on
+  a websocket; `python -m client` opens a window that plays against it. Several
+  clients share one server and see the same game.
+- **Tests:** `pytest` (368 tests). Single file: `pytest tests/test_engine.py`.
   Single test: `pytest tests/test_engine.py::test_name` or `pytest -k name`.
 - **Coverage:** `pytest --cov` (config in `.coveragerc`; `htmlcov/` is
   intentionally committed as a browsable report). Product code is measured at
@@ -59,29 +62,62 @@ it sequences.
 - `game/` — `GameEngine` (`engine.py`) is the public command boundary: it
   applies application-level guards (game over, busy/resting, the
   `ALLOW_CONCURRENT_MOVES` policy), delegates validation to `RuleEngine`, starts
-  validated motions on the arbiter, advances time, records moves
-  (`move_log.py`), scores captures (`scoreboard.py`, `notation.py`), and exposes
-  read models. `controller.py` owns selection state and turns pixel clicks into
-  engine commands (via `board_mapper.py`); `parser.py` splits a script into
-  board/commands sections. `composition.py` is the **single composition root** —
-  the one place the whole dependency graph is wired.
+  validated motions on the arbiter, advances time, and **publishes** what
+  happened on the `EventBus` (see `events/`), never calling its consumers by
+  name. `controller.py` owns selection state and turns pixel clicks into gateway
+  commands (via `board_mapper.py`), deciding what a click does from the render
+  model rather than a command's reply, so it drives a remote game unchanged;
+  `subscribers.py` (`MoveRecorder`, `CaptureScorer`) writes the move log and
+  score off the bus; `squares.py` is the one place a file/rank square (`e2`) is
+  written and read; `parser.py` splits a script into board/commands sections.
+  `composition.py` is the **single composition root** — the one place the whole
+  dependency graph is wired.
+- `events/` — `EventBus`: a domain-agnostic publish/subscribe mechanism that
+  routes each event to the subscribers of its exact type. `game/events.py` holds
+  the vocabulary (`GameStarted`, `MoveCompleted`, `PieceCaptured`, `JumpStarted`,
+  `GameEnded`); a subscriber is any callable, so nothing inherits an interface.
+  This is what lets a new consumer — a sound, a banner, a network broadcaster —
+  attach without the engine changing.
 - `view/` — read-only view models. `snapshot.py` (`GameSnapshot`) + `renderer.py`
   produce the canonical text render; `render_model.py` (`RenderModel`) is the
   rich read model for the GUI. The view never touches the live board.
 - `graphics/` — cv2 adapters (`Img` drawing primitive, `Window`) and sprite
   loading (`assets.py`, `sprite*.py`).
 - `ui/` — `game_loop.py` (real-time frame loop), `graphics_renderer.py`
-  (`RenderModel` → canvas), `hud.py`, `input_source.py`, `move_table_panel.py`.
-  Only `graphics/`, `ui/`, and `play.py` read the GUI-only config; the text/VPL
-  path never touches them, so the grader is unaffected.
-- `gateway/` — `GameGateway` Protocol + `NetworkGateway` stub for a future
-  networked mode. `RenderModel` is deliberately the serializable read model a
-  server would send and a client would draw.
+  (`RenderModel` → canvas), `hud.py`, `animation.py` (banner), `input_source.py`,
+  `move_table_panel.py`, and `composition.py` — the **one place the graphical UI
+  is wired**, shared by the local and networked entry points, which differ only
+  in which gateway they hand it. Only `graphics/`, `ui/`, `audio/`, and the GUI
+  entry points read the GUI-only config; the text/VPL path never touches them.
+- `audio/` — sound as presentation, kept out of `game/`: `player.py` wraps
+  winsound, `cues.py` subscribes one sound per event to the bus.
+- `gateway/` — the `GameGateway` Protocol the UI depends on, never the concrete
+  engine. `GameEngine` satisfies it in-process; `client/NetworkGateway` satisfies
+  it over the wire. Commands report nothing back (a remote reply could not arrive
+  in time); everything the UI learns comes from the `RenderModel`.
+- `protocol/` — pure translation to and from what crosses the wire, with no I/O:
+  `commands.py` (`WQe2e5`), `state.py` (`RenderModel`), `events.py` (bus events),
+  `messages.py` (the JSON envelope), over the shared `records.py` mechanism.
+  Tested in full without a socket, exactly as `board/loaders.py` is.
+- `server/` — what turns the game into a service. `broadcast.py` relays events
+  and state; `handler.py` turns client messages into engine commands, trusting
+  only the squares (never the piece a client claims); `service.py` is the game a
+  socket drives; `socket.py` is the sole websockets/asyncio shell; `outbox.py`
+  queues lines so the blocking game never awaits the network. `python -m server`
+  wires it, and is the **only place the clock advances**.
+- `client/` — a window with no game inside it. `gateway.py` is the remote proxy;
+  `inbox.py` is the single point the two threads meet (socket thread writes,
+  frame loop reads); `router.py` places each arriving message (state and hints
+  to the inbox, events republished on the client's own bus); `socket.py` is the
+  websockets shell, on a background thread because the cv2 loop blocks;
+  `waiting.py` is the screen shown until the first state arrives.
 
-**Two entry points, one graph:** `main.py` (`run`) drives the text script and
-must stay grader-stable; `play.py` builds the *same* `GameEngine` from
-`assets/board.csv` for the real-time loop. Both defer only board loading to
-themselves and delegate the rest of the wiring to `game/composition.py`.
+**Four entry points, one graph:** `main.py` (text script, grader-stable),
+`play.py` (local GUI), `python -m server` (authoritative networked game), and
+`python -m client` (a window that draws it). All build the *same* `GameEngine`
+via `game/composition.py`, differing only in where the board comes from and, for
+the client, in swapping the engine for a `NetworkGateway` behind the same
+`GameGateway` contract.
 
 ## Conventions that constrain how you write code
 
