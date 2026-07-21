@@ -7,6 +7,9 @@ a-h / 1-8 coordinate labels in the gutter around the board, and the game-over
 banner - and it composes two MoveTablePanels (Black on the left, White on the
 right) so the move-list drawing lives in one reusable place. The board and its
 pieces are drawn separately by GraphicsRenderer; the Hud only frames them.
+
+What the banner says and how long it lasts belongs to the BannerAnimation it is
+handed; the Hud only asks what to draw at the current clock.
 """
 from __future__ import annotations
 
@@ -17,10 +20,11 @@ _TEXT = (35, 35, 35, 255)          # near-black title / score / label text (BGRA
 _BANNER_BG = (0, 0, 0, 180)        # translucent black
 _BANNER_TEXT = (0, 0, 255, 255)    # red
 _APPROX_CHAR_PX = 10               # rough per-character width, for centering text
+_BANNER_CHAR_PX = 46               # the same, at the banner's larger text scale
 
 
 class Hud:
-    def __init__(self, config):
+    def __init__(self, config, banner):
         self._bx = config.BOARD_ORIGIN_X
         self._by = config.BOARD_ORIGIN_Y
         self._cell = config.CELL_SIZE
@@ -33,6 +37,7 @@ class Hud:
             self._by + self._board_px + self._gutter + config.SCORE_HEIGHT - 12
         )
         self._banner = solid(self._board_px, 90, _BANNER_BG)
+        self._animation = banner
         # Black is at the top of the board (left panel); White at the bottom (right).
         self._black_panel = MoveTablePanel(
             "Black", "b", 10, self._by, config.PANEL_WIDTH - 20, self._board_px
@@ -48,8 +53,7 @@ class Hud:
         self._draw_coordinates(canvas, model)
         self._black_panel.draw(canvas, model)
         self._white_panel.draw(canvas, model)
-        if model.game_over:
-            self._draw_game_over(canvas)
+        self._draw_banner(canvas, model.clock)
 
     def _draw_title(self, canvas):
         text = f"Name: {self._name}"
@@ -77,11 +81,13 @@ class Hud:
             canvas.put_text(rank, self._bx - 20, y, 0.6, _TEXT, 1)
             canvas.put_text(rank, self._bx + self._board_px + 10, y, 0.6, _TEXT, 1)
 
-    def _draw_game_over(self, canvas):
+    def _draw_banner(self, canvas, clock):
+        text = self._animation.text_at(clock)
+        if text is None:
+            return
         self._banner.draw_on(canvas, self._bx, self._by + self._board_px // 2 - 45)
-        text = "GAME OVER"
-        canvas.put_text(text, self._bx + self._board_px // 2 - 210,
-                        self._by + self._board_px // 2 + 15, 2.0, _BANNER_TEXT, 4)
+        x = self._bx + self._board_px // 2 - len(text) * _BANNER_CHAR_PX // 2
+        canvas.put_text(text, x, self._by + self._board_px // 2 + 15, 2.0, _BANNER_TEXT, 4)
 
     def _centered(self, text):
         """Approximate x so `text` is roughly centered over the board (Img exposes

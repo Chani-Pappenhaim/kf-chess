@@ -93,3 +93,13 @@ WINDOW_HEIGHT = TITLE_HEIGHT + 2 * SCORE_HEIGHT + 2 * COORD_GUTTER + BOARD_PX
 
 # Name shown in the top title strip as "Name: <PLAYER_NAME>".
 PLAYER_NAME = "Player"
+
+# Written form of each color, for anything that names a player.
+COLOR_NAMES = {"w": "White", "b": "Black"}
+
+# Banner overlaid on the board when the game opens and when it ends. The start
+# banner clears itself after START_BANNER_MS; the end banner has nothing to
+# make way for, so it stays.
+START_BANNER_TEXT = "GO!"
+START_BANNER_MS = 1500
+END_BANNER_TEXT = "{winner} WINS"

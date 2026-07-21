@@ -21,6 +21,7 @@ from graphics.window import Window
 from ui.game_loop import GameLoop
 from ui.graphics_renderer import GraphicsRenderer
 from ui.hud import Hud
+from ui.animation import subscribe_banner
 from ui.input_source import InputTranslator
 
 _BACKGROUND_COLOR = (238, 238, 238, 255)  # light window background around the board
@@ -76,7 +77,7 @@ def run(config=settings):  # pragma: no cover - real-time GUI loop
     sprites = AssetLoader(config).load_sprite_library()
     origin = (config.BOARD_ORIGIN_X, config.BOARD_ORIGIN_Y)
     renderer = GraphicsRenderer(sprites, config.CELL_SIZE, origin=origin)
-    hud = Hud(config)
+    hud = Hud(config, subscribe_banner(bus, config))
     base = new_base_canvas(config)
     engine.start()
     GameLoop(window, engine, controller, renderer, hud, translator, base).run()

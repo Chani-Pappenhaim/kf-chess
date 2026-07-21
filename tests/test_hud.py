@@ -2,7 +2,9 @@ import numpy as np
 
 from config import settings
 from ui.hud import Hud
+from ui.animation import BannerAnimation
 from view.render_model import RenderModel
+from game.events import GameEnded
 from game.move_log import MoveRecord
 
 
@@ -19,6 +21,17 @@ def _canvas():
     return _FakeCanvas(settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT)
 
 
+class _NoBanner:
+    """Stands in for the BannerAnimation where the banner is beside the point."""
+
+    def text_at(self, clock):
+        return None
+
+
+def _hud(banner=None):
+    return Hud(settings, banner or _NoBanner())
+
+
 def _model(**overrides):
     base = dict(pieces=(), width=8, height=8)
     base.update(overrides)
@@ -27,7 +40,7 @@ def _model(**overrides):
 
 def test_hud_shows_the_title_and_both_scores():
     canvas = _canvas()
-    Hud(settings).draw(canvas, _model(scores={"w": 5, "b": 3}))
+    _hud().draw(canvas, _model(scores={"w": 5, "b": 3}))
     assert f"Name: {settings.PLAYER_NAME}" in canvas.texts
     assert "Score: 5" in canvas.texts  # white, below the board
     assert "Score: 3" in canvas.texts  # black, above the board
@@ -35,7 +48,7 @@ def test_hud_shows_the_title_and_both_scores():
 
 def test_hud_draws_coordinate_labels():
     canvas = _canvas()
-    Hud(settings).draw(canvas, _model())
+    _hud().draw(canvas, _model())
     assert "a" in canvas.texts and "h" in canvas.texts
     assert "1" in canvas.texts and "8" in canvas.texts
 
@@ -43,19 +56,21 @@ def test_hud_draws_coordinate_labels():
 def test_hud_lists_each_colors_moves_in_its_panel():
     moves = (MoveRecord("w", "e2-e4", 4105), MoveRecord("b", "e7-e5", 9000))
     canvas = _canvas()
-    Hud(settings).draw(canvas, _model(moves=moves))
+    _hud().draw(canvas, _model(moves=moves))
     assert "e2-e4" in canvas.texts       # white panel
     assert "e7-e5" in canvas.texts       # black panel
     assert "00:04.105" in canvas.texts   # formatted move time
 
 
-def test_hud_draws_game_over_banner():
+def test_hud_draws_whatever_the_animation_is_showing():
+    banner = BannerAnimation(settings)
+    banner.announce_end(GameEnded(winner="w", at_ms=0))
     canvas = _canvas()
-    Hud(settings).draw(canvas, _model(game_over=True))
-    assert "GAME OVER" in canvas.texts
+    _hud(banner).draw(canvas, _model(clock=0))
+    assert "WHITE WINS" in canvas.texts
 
 
-def test_hud_hides_banner_while_playing():
+def test_hud_draws_no_banner_when_the_animation_shows_none():
     canvas = _canvas()
-    Hud(settings).draw(canvas, _model(game_over=False))
-    assert "GAME OVER" not in canvas.texts
+    _hud().draw(canvas, _model(clock=0))
+    assert canvas.texts and "WINS" not in " ".join(canvas.texts)
