@@ -41,8 +41,15 @@ def build_service(config=settings):
 def run(config=settings):  # pragma: no cover - runs until interrupted
     engine, outbox, service = build_service(config)
     engine.start()
-    print(f"KungFu Chess server listening on {config.SERVER_URL}")
-    asyncio.run(WebSocketServer(config, outbox, service).run())
+    try:
+        print(f"KungFu Chess server listening on {config.SERVER_URL}")
+        asyncio.run(WebSocketServer(config, outbox, service).run())
+    except OSError as error:
+        # Almost always a server already running on that port. A stack trace
+        # says nothing a person can act on; the address and the reason do.
+        print(f"cannot listen on {config.SERVER_URL}: {error.strerror}")
+    except KeyboardInterrupt:
+        print("server stopped")
 
 
 if __name__ == "__main__":  # pragma: no cover
