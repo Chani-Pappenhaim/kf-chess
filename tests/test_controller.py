@@ -1,39 +1,16 @@
 from config import settings
 from board.board import Board
-from rules.rule_registry import build_default_registry
-from rules.rule_engine import RuleEngine
-from rules.game_conditions import KingCaptureWinCondition, LastRankPromotion
-from realtime.real_time_arbiter import RealTimeArbiter
-from game.engine import GameEngine
-from game.board_mapper import BoardMapper
-from game.controller import Controller
-from game.move_log import MoveLog
-from game.scoreboard import Scoreboard
-from game.notation import CoordinateNotation
-from game.subscribers import MoveRecorder, CaptureScorer
-from game.events import MoveCompleted, PieceCaptured
 from events.bus import EventBus
+from rules.rule_registry import build_default_registry
+from game.composition import build_game
 
 
 def make_controller(rows):
+    # The controller is exercised over the real graph, so this asks the
+    # composition root for it rather than repeating the wiring here.
     board = Board(rows, ".")
     registry = build_default_registry(settings)
-    move_log = MoveLog()
-    scoreboard = Scoreboard(settings.COLORS)
-    bus = EventBus()
-    bus.subscribe(MoveCompleted, MoveRecorder(move_log, CoordinateNotation(board.height)).record)
-    bus.subscribe(PieceCaptured, CaptureScorer(scoreboard, settings.PIECE_VALUES).award)
-    engine = GameEngine(
-        board=board,
-        rule_engine=RuleEngine(rule_registry=registry, config=settings),
-        arbiter=RealTimeArbiter(board=board, promotion_rule=LastRankPromotion(settings.PAWN_DIRECTION), config=settings),
-        win_condition=KingCaptureWinCondition(),
-        config=settings,
-        move_log=move_log,
-        scoreboard=scoreboard,
-        bus=bus,
-    )
-    controller = Controller(engine=engine, board_mapper=BoardMapper(board, settings.CELL_SIZE))
+    engine, controller = build_game(board, registry, settings, EventBus())
     return controller, engine, board
 
 

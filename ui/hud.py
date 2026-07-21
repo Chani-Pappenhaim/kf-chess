@@ -86,10 +86,11 @@ class Hud:
         if text is None:
             return
         self._banner.draw_on(canvas, self._bx, self._by + self._board_px // 2 - 45)
-        x = self._bx + self._board_px // 2 - len(text) * _BANNER_CHAR_PX // 2
-        canvas.put_text(text, x, self._by + self._board_px // 2 + 15, 2.0, _BANNER_TEXT, 4)
+        canvas.put_text(text, self._centered(text, _BANNER_CHAR_PX),
+                        self._by + self._board_px // 2 + 15, 2.0, _BANNER_TEXT, 4)
 
-    def _centered(self, text):
+    def _centered(self, text, char_px=_APPROX_CHAR_PX):
         """Approximate x so `text` is roughly centered over the board (Img exposes
-        no text-measuring, so this estimates the width from the character count)."""
-        return self._bx + self._board_px // 2 - len(text) * _APPROX_CHAR_PX // 2
+        no text-measuring, so this estimates the width from the character count).
+        `char_px` is the per-character width at the scale the text is drawn."""
+        return self._bx + self._board_px // 2 - len(text) * char_px // 2
