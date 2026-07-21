@@ -92,3 +92,20 @@ def test_jump_outside_board_is_ignored():
     controller, engine, board = make_controller([["wK", "."], [".", "."]])
     controller.jump(-10, -10)  # out of bounds: no crash, no selection
     assert controller.selected is None
+
+
+def test_second_click_clears_a_selection_whose_piece_has_left():
+    # The game can move on without going through this controller - a command
+    # already in flight, or another player's client - so the selected square
+    # may hold nothing by the time the second click lands.
+    controller, engine, board = make_controller(
+        [["wR", ".", "."], [".", ".", "."], [".", ".", "."]]
+    )
+    controller.click(*cell_to_pixel(0, 0))
+    assert controller.selected == (0, 0)
+
+    engine.request_move((0, 0), (0, 2))     # started behind the controller's back
+    engine.wait(settings.MOVE_DURATION)     # the rook has stepped off (0, 0)
+
+    controller.click(*cell_to_pixel(2, 2))
+    assert controller.selected is None

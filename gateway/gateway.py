@@ -7,24 +7,31 @@ these methods, so it satisfies the contract with no wrapper class. A future
 NetworkGateway will implement the same methods over the wire, forwarding to an
 engine running on a server - see NetworkGateway below.
 
-It is deliberately message/DTO based: commands take plain cells, replies are a
-MoveResult or the immutable RenderModel, and no live Board or arbiter object
-ever crosses the seam - which is what keeps the networked implementation clean.
+Commands are sent, not asked: they report nothing back, because a remote one
+could not answer in time to be useful. Everything the UI learns, it learns from
+the render model. GameEngine still returns a MoveResult to its own callers; the
+UI is simply not one of them.
+
+It is deliberately message/DTO based: commands take plain cells, the reply is
+the immutable RenderModel, and no live Board or arbiter object ever crosses the
+seam - which is what keeps the networked implementation clean.
 """
 from __future__ import annotations
 
 from typing import Protocol, runtime_checkable
 
-from game.models import MoveResult
 from view.render_model import RenderModel
 
 
 @runtime_checkable
 class GameGateway(Protocol):
-    def request_move(self, start, end) -> MoveResult:
+    def legal_targets(self, cell) -> tuple:
         ...
 
-    def request_jump(self, cell) -> MoveResult:
+    def request_move(self, start, end) -> None:
+        ...
+
+    def request_jump(self, cell) -> None:
         ...
 
     def wait(self, dt) -> None:
@@ -37,12 +44,12 @@ class GameGateway(Protocol):
 class NetworkGateway:
     """Planned remote implementation of GameGateway (not yet built).
 
-    Documented here to make the extension point explicit: it will implement the
-    same five methods, serialising each command and returning the MoveResult /
-    RenderModel received from a server that runs the authoritative GameEngine.
-    Because the engine is deterministic and its clock is injected via wait(dt),
-    the server can order contested moves by timestamp and every client converges
-    to the same state. No UI code changes when this replaces the local engine.
+    Documented here to make the extension point explicit: a remote proxy that
+    serialises each command to a server running the authoritative GameEngine,
+    and answers every query from the last state that server sent back. Because
+    the engine's clock is injected via wait(dt), the server alone advances time
+    and every client draws the state it is given. No UI code changes when this
+    replaces the local engine.
     """
 
     def __init__(self, *args, **kwargs):

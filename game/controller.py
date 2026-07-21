@@ -1,14 +1,15 @@
-from rules.reasons import Reason
-
-
 class Controller:
-    """Translates user clicks/jumps into GameEngine commands and owns the
-    selected-cell state. It decides nothing about chess legality - it only
-    turns pixels into cells (via BoardMapper) and drives the engine's public
-    command path, then updates its selection from the engine's MoveResult.
+    """Translates user clicks/jumps into game commands and owns the selected-cell
+    state. It decides nothing about chess legality - it only turns pixels into
+    cells (via BoardMapper) and drives the gateway's public command path.
 
-    Both collaborators are injected. Selection is deliberately kept here (not
-    on the engine) so the engine stays a pure application service.
+    A command is sent and not waited on: what a click does to the selection is
+    decided from the render model the view already holds, never from a reply.
+    That is what lets the same controller drive a remote game, where a reply
+    could not arrive in time to matter.
+
+    Both collaborators are injected. Selection is deliberately kept here (not on
+    the engine) so the engine stays a pure application service.
     """
 
     def __init__(self, engine, board_mapper):
@@ -36,15 +37,19 @@ class Controller:
             # Outside the board: leave selection untouched (a no-op click).
             return
 
+        model = self._engine.render_model()
         if self._selected is None:
             # First click selects a piece if that cell can be a move source.
-            if self._selectable(cell):
+            if model.selectable(cell):
                 self._selected = cell
             return
 
-        # Second click: ask the engine to move, then update selection.
-        result = self._engine.request_move(self._selected, cell)
-        self._resolve_selection(result, cell)
+        # Second click: send the move, then re-select or clear. Clicking another
+        # of your own free pieces picks that one up instead; every other second
+        # click clears the selection, whether the move was accepted or refused.
+        self._engine.request_move(self._selected, cell)
+        own_free_piece = self._same_color_as_selection(model, cell) and model.selectable(cell)
+        self._selected = cell if own_free_piece else None
 
     def jump(self, x, y):
         # A jump ends any pending selection first.
@@ -54,19 +59,12 @@ class Controller:
             return
         self._engine.request_jump(cell)
 
-    def _resolve_selection(self, result, cell):
-        # Clicking another of your own pieces re-selects it (unless that piece
-        # is busy). Every other second click clears the selection: the move
-        # started, or the target was not a legal destination (illegal, blocked
-        # by another motion, off-limits after game over, or an unusable source).
-        if result.reason == Reason.FRIENDLY_DESTINATION and self._selectable(cell):
-            self._selected = cell
-        else:
-            self._selected = None
-
-    def _selectable(self, cell):
-        """Whether `cell` may be picked as a move source. Read off the render
-        model rather than asked of the engine, because it is a question about
-        state the view already holds - which is what lets a client with no
-        engine of its own answer it too."""
-        return self._engine.render_model().selectable(cell)
+    def _same_color_as_selection(self, model, cell):
+        """Whether `cell` holds a piece of the selected piece's own color. The
+        selected piece can be gone by now - captured while it sat selected - so
+        both squares are looked up rather than assumed occupied."""
+        selected = model.piece_at(self._selected)
+        target = model.piece_at(cell)
+        if selected is None or target is None:
+            return False
+        return target.token[0] == selected.token[0]
