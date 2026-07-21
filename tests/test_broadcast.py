@@ -1,3 +1,5 @@
+import play
+from config import settings
 from events.bus import EventBus
 from game.events import (
     GameEnded,
@@ -7,8 +9,9 @@ from game.events import (
     PieceCaptured,
 )
 from protocol.events import EVENT_TYPES, decode_event
-from protocol.messages import EventNotice, decode
-from server.broadcast import subscribe_broadcast
+from protocol.messages import EventNotice, StateUpdate, decode
+from protocol.state import decode_model
+from server.broadcast import broadcast_state, subscribe_broadcast
 
 ONE_OF_EACH = (
     GameStarted(at_ms=0),
@@ -62,3 +65,14 @@ def test_a_bus_with_no_broadcaster_sends_nothing():
     bus, sent = EventBus(), []
     bus.publish(GameStarted(at_ms=0))
     assert sent == []
+
+
+def test_the_state_goes_out_as_one_message():
+    engine = play.build_engine(settings)
+    sent = []
+    broadcast_state(engine, sent.append)
+
+    assert len(sent) == 1
+    message = decode(sent[0])
+    assert isinstance(message, StateUpdate)
+    assert decode_model(message.state) == engine.render_model()

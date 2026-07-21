@@ -1,16 +1,17 @@
-"""Relays published events to connected clients.
+"""What the server sends out: the state to draw, and the events as they happen.
 
-One more subscriber on the game's bus, alongside the move log and the score.
-The engine gains nothing and knows nothing: what makes a game networked is a
-subscription, not a change to how the game is played.
+Relaying events is one more subscriber on the game's bus, alongside the move log
+and the score. The engine gains nothing and knows nothing: what makes a game
+networked is a subscription, not a change to how the game is played.
 
-`send` is injected - a plain callable taking one line of text - so nothing here
-knows what a socket is.
+`send` is injected everywhere here - a plain callable taking one line of text -
+so nothing in this module knows what a socket is.
 """
 from __future__ import annotations
 
 from protocol.events import EVENT_TYPES, encode_event
-from protocol.messages import EventNotice, encode
+from protocol.messages import EventNotice, StateUpdate, encode
+from protocol.state import encode_model
 
 
 def subscribe_broadcast(bus, send):
@@ -24,3 +25,13 @@ def subscribe_broadcast(bus, send):
 
     for event_type in EVENT_TYPES:
         bus.subscribe(event_type, relay)
+
+
+def broadcast_state(engine, send):
+    """Send the whole state as it stands right now.
+
+    Whole, not the difference from last time: a client that misses one of these
+    is corrected by the next, and one that has just connected needs no catching
+    up beyond a single line.
+    """
+    send(encode(StateUpdate(encode_model(engine.render_model()))))

@@ -103,3 +103,14 @@ COLOR_NAMES = {"w": "White", "b": "Black"}
 START_BANNER_TEXT = "GO!"
 START_BANNER_MS = 1500
 END_BANNER_TEXT = "{winner} WINS"
+
+# --- Networked play --------------------------------------------------------
+# Only server/ and client/ read these; the local paths never touch them.
+SERVER_HOST = "localhost"
+SERVER_PORT = 8765
+SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}"
+
+# How often the server advances the game and sends the state out. The clock
+# lives on the server alone, so this is the only place time passes: clients
+# draw what they are sent and never advance anything themselves.
+SERVER_TICK_MS = 33
