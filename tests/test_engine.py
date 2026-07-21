@@ -273,11 +273,11 @@ def test_jump_from_a_piece_resting_after_a_jump_is_rejected():
     assert result.reason == Reason.RESTING
 
 
-def test_resting_piece_cannot_be_selected():
+def test_a_resting_piece_is_not_selectable():
     engine, _ = make_engine([["wR", ".", "."]])
     engine.request_move((0, 0), (0, 1))
     engine.wait(settings.MOVE_DURATION)
-    assert engine.can_select((0, 1)) is False
+    assert engine.render_model().selectable((0, 1)) is False
 
 
 def test_cooldown_expires_and_the_piece_can_move_again():
@@ -312,12 +312,12 @@ def test_busy_source_is_rejected_while_that_piece_is_moving():
     assert result.reason == Reason.BUSY_SOURCE
 
 
-def test_can_select_returns_false_after_game_over():
+def test_nothing_is_selectable_after_game_over():
     rows = [["wR", ".", "bK"], ["bR", ".", "."], [".", ".", "."]]
     engine, board = make_engine(rows)
     engine.request_move((0, 0), (0, 2))
     engine.wait(2 * settings.MOVE_DURATION)  # captures bK -> game over
-    assert engine.can_select((1, 0)) is False
+    assert engine.render_model().selectable((1, 0)) is False
 
 
 def test_jump_after_game_over_is_rejected():

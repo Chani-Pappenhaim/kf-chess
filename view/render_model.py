@@ -13,12 +13,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+# Animation states the model defines for itself. The two rest states are named
+# in config instead, because the sprite loader reads them as folder names.
+IDLE_STATE = "idle"
+MOVE_STATE = "move"
+JUMP_STATE = "jump"
+
 
 @dataclass(frozen=True)
 class RenderPiece:
     token: str          # internal board token, e.g. "wP"
     cell: tuple         # (row, col) the piece occupies on the board right now
-    state: str = "idle"  # idle / move / jump / short_rest / long_rest
+    state: str = IDLE_STATE  # idle / move / jump / short_rest / long_rest
     target: tuple | None = None  # the cell it is stepping into, while in flight
     progress: float = 0.0        # 0..1: along cell -> target for a move, or
                                  # through the hop for a jump (0 when still)
@@ -34,3 +40,17 @@ class RenderModel:
     clock: int = 0  # elapsed simulated time in ms (for the HUD)
     moves: tuple = ()  # MoveRecord per completed move, in order (both colors)
     scores: dict = field(default_factory=dict)  # {color: accumulated points}
+
+    def selectable(self, cell):
+        """Whether `cell` can be picked as a move source: a piece is there and
+        it is free to act - not mid-move, not airborne, not resting.
+
+        A question about state, not about the rules, so it is answerable from
+        this model alone - by the view here, or by a client with no board.
+        """
+        if self.game_over:
+            return False
+        return any(
+            piece.cell == cell and piece.state == IDLE_STATE
+            for piece in self.pieces
+        )

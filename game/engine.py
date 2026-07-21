@@ -8,7 +8,7 @@ from game.events import (
 )
 from rules.reasons import Reason
 from view.snapshot import GameSnapshot
-from view.render_model import RenderModel, RenderPiece
+from view.render_model import RenderModel, RenderPiece, MOVE_STATE, JUMP_STATE
 
 
 class GameEngine:
@@ -68,17 +68,6 @@ class GameEngine:
 
     def is_busy(self, cell):
         return self._arbiter.is_mover_on(cell) or self._arbiter.is_jumping_on(cell)
-
-    def can_select(self, cell):
-        """Whether `cell` can be picked as a move source right now."""
-        self._apply_events(self._arbiter.resolve())
-        if self._game_over:
-            return False
-        return (
-            not self.is_busy(cell)
-            and not self._arbiter.is_resting(cell)
-            and not self._board.is_empty(*cell)
-        )
 
     def legal_targets(self, cell):
         """Cells the piece on `cell` may currently move to, for the UI's move
@@ -172,7 +161,7 @@ class GameEngine:
             return RenderPiece(
                 token=token,
                 cell=cell,
-                state="move",
+                state=MOVE_STATE,
                 target=motion.end,
                 progress=motion.progress,
             )
@@ -180,7 +169,7 @@ class GameEngine:
             return RenderPiece(
                 token=token,
                 cell=cell,
-                state="jump",
+                state=JUMP_STATE,
                 progress=self._arbiter.jump_progress(cell) or 0.0,
             )
         rest_state = self._arbiter.cooldown_of(cell)

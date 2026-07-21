@@ -21,9 +21,6 @@ from view.render_model import RenderModel
 
 @runtime_checkable
 class GameGateway(Protocol):
-    def can_select(self, cell) -> bool:
-        ...
-
     def request_move(self, start, end) -> MoveResult:
         ...
 

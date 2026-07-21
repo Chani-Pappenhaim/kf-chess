@@ -38,8 +38,7 @@ class Controller:
 
         if self._selected is None:
             # First click selects a piece if that cell can be a move source.
-            # can_select() settles pending arrivals and refuses after game over.
-            if self._engine.can_select(cell):
+            if self._selectable(cell):
                 self._selected = cell
             return
 
@@ -60,7 +59,14 @@ class Controller:
         # is busy). Every other second click clears the selection: the move
         # started, or the target was not a legal destination (illegal, blocked
         # by another motion, off-limits after game over, or an unusable source).
-        if result.reason == Reason.FRIENDLY_DESTINATION and self._engine.can_select(cell):
+        if result.reason == Reason.FRIENDLY_DESTINATION and self._selectable(cell):
             self._selected = cell
         else:
             self._selected = None
+
+    def _selectable(self, cell):
+        """Whether `cell` may be picked as a move source. Read off the render
+        model rather than asked of the engine, because it is a question about
+        state the view already holds - which is what lets a client with no
+        engine of its own answer it too."""
+        return self._engine.render_model().selectable(cell)
