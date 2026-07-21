@@ -41,6 +41,17 @@ class RenderModel:
     moves: tuple = ()  # MoveRecord per completed move, in order (both colors)
     scores: dict = field(default_factory=dict)  # {color: accumulated points}
 
+    def piece_at(self, cell):
+        """The piece occupying `cell`, or None when the square is empty.
+
+        Empty squares carry no entry of their own - there is nothing to draw and
+        nothing to send - so absence is what an empty square looks like here.
+        """
+        for piece in self.pieces:
+            if piece.cell == cell:
+                return piece
+        return None
+
     def selectable(self, cell):
         """Whether `cell` can be picked as a move source: a piece is there and
         it is free to act - not mid-move, not airborne, not resting.
@@ -50,7 +61,5 @@ class RenderModel:
         """
         if self.game_over:
             return False
-        return any(
-            piece.cell == cell and piece.state == IDLE_STATE
-            for piece in self.pieces
-        )
+        piece = self.piece_at(cell)
+        return piece is not None and piece.state == IDLE_STATE

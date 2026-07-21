@@ -77,3 +77,14 @@ def test_render_model_reports_cooldown_progress_for_a_resting_piece():
     piece = resting[0]
     assert piece.state == "long_rest"
     assert 0 < piece.cooldown_progress < 1
+
+
+def test_piece_at_finds_the_occupant_of_a_square():
+    model = play.build_engine(settings).render_model()
+    assert model.piece_at((7, 4)).token == "wK"
+
+
+def test_piece_at_reports_an_empty_square_as_nothing_there():
+    model = play.build_engine(settings).render_model()
+    assert model.piece_at((4, 4)) is None
+    assert model.selectable((4, 4)) is False
