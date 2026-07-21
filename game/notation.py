@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from game.squares import square_of
+
 
 class MoveNotation(ABC):
     """Formats a completed move into a display string."""
@@ -42,7 +44,4 @@ class CoordinateNotation(MoveNotation):
         return f"{letter}{self._square(origin)}{separator}{self._square(dest)}"
 
     def _square(self, cell):
-        row, col = cell
-        file = chr(ord("a") + col)
-        rank = self._height - row
-        return f"{file}{rank}"
+        return square_of(cell, self._height)
