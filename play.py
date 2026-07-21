@@ -14,7 +14,8 @@ from game.composition import (
     build_game as _build_game,
 )
 from audio.player import AudioPlayer
-from game.observers import SoundPlayer
+from audio.cues import subscribe_sound
+from events.bus import EventBus
 from graphics.assets import AssetLoader, read_image, solid
 from graphics.window import Window
 from ui.game_loop import GameLoop
@@ -51,31 +52,33 @@ def _compose(config):
     return board, registry
 
 
-def build_engine(config=settings):
+def build_engine(config=settings, bus=None):
     """Compose the GameEngine alone (used where no input handling is needed)."""
     board, registry = _compose(config)
-    return _build_engine(board, registry, config)
+    return _build_engine(board, registry, config, bus or EventBus())
 
 
-def build_game(config=settings):
+def build_game(config=settings, bus=None):
     """The engine plus a Controller, ready to take input. The mapper is offset
     by the board's origin so clicks on the framed board hit the right cell."""
     board, registry = _compose(config)
     origin = (config.BOARD_ORIGIN_X, config.BOARD_ORIGIN_Y)
-    return _build_game(board, registry, config, board_origin=origin)
+    return _build_game(board, registry, config, bus or EventBus(), board_origin=origin)
 
 
 def run(config=settings):  # pragma: no cover - real-time GUI loop
     """Build and wire every component, then hand them to the GameLoop."""
     window = Window(config.WINDOW_TITLE)
-    engine, controller = build_game(config)
-    engine.subscribe(SoundPlayer(AudioPlayer(), config))
+    bus = EventBus()
+    engine, controller = build_game(config, bus)
+    subscribe_sound(bus, AudioPlayer(), config)
     translator = InputTranslator(controller)
     sprites = AssetLoader(config).load_sprite_library()
     origin = (config.BOARD_ORIGIN_X, config.BOARD_ORIGIN_Y)
     renderer = GraphicsRenderer(sprites, config.CELL_SIZE, origin=origin)
     hud = Hud(config)
     base = new_base_canvas(config)
+    engine.start()
     GameLoop(window, engine, controller, renderer, hud, translator, base).run()
 
 

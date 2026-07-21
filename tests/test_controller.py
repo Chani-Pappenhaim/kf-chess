@@ -10,7 +10,9 @@ from game.controller import Controller
 from game.move_log import MoveLog
 from game.scoreboard import Scoreboard
 from game.notation import CoordinateNotation
-from game.observers import MoveRecorder, CaptureScorer
+from game.subscribers import MoveRecorder, CaptureScorer
+from game.events import MoveCompleted, PieceCaptured
+from events.bus import EventBus
 
 
 def make_controller(rows):
@@ -18,6 +20,9 @@ def make_controller(rows):
     registry = build_default_registry(settings)
     move_log = MoveLog()
     scoreboard = Scoreboard(settings.COLORS)
+    bus = EventBus()
+    bus.subscribe(MoveCompleted, MoveRecorder(move_log, CoordinateNotation(board.height)).record)
+    bus.subscribe(PieceCaptured, CaptureScorer(scoreboard, settings.PIECE_VALUES).award)
     engine = GameEngine(
         board=board,
         rule_engine=RuleEngine(rule_registry=registry, config=settings),
@@ -26,10 +31,7 @@ def make_controller(rows):
         config=settings,
         move_log=move_log,
         scoreboard=scoreboard,
-        observers=(
-            MoveRecorder(move_log, CoordinateNotation(board.height)),
-            CaptureScorer(scoreboard, settings.PIECE_VALUES),
-        ),
+        bus=bus,
     )
     controller = Controller(engine=engine, board_mapper=BoardMapper(board, settings.CELL_SIZE))
     return controller, engine, board

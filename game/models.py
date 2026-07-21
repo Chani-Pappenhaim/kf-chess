@@ -13,15 +13,3 @@ class MoveResult:
 
     is_accepted: bool
     reason: str
-
-
-@dataclass(frozen=True)
-class JumpEvent:
-    """A piece has begun a jump. Announced by the engine the instant the command
-    is accepted. It captures nothing, so it rides the same event handling as a
-    completed move without ever ending the game."""
-
-    piece: str
-    cell: tuple
-    at_ms: int = 0
-    captured: str | None = None

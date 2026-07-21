@@ -1,4 +1,11 @@
-from game.models import MoveResult, JumpEvent
+from game.models import MoveResult
+from game.events import (
+    GameStarted,
+    MoveCompleted,
+    PieceCaptured,
+    JumpStarted,
+    GameEnded,
+)
 from rules.reasons import Reason
 from view.snapshot import GameSnapshot
 from view.render_model import RenderModel, RenderPiece
@@ -15,9 +22,9 @@ class GameEngine:
     advancing time, and exposing a read-only snapshot.
 
     What should HAPPEN when a move completes is not its business either: it
-    announces each event to its observers (see game/observers.py) without
-    knowing who they are. `move_log` and `scoreboard` are still held here, but
-    only as read handles for the view - the observers are what write to them.
+    publishes the events of game/events.py on the bus and never learns who
+    listens. `move_log` and `scoreboard` are still held here, but only as read
+    handles for the view - subscribers are what write to them.
 
     All collaborators are injected through the constructor - no module-level
     state, no hidden globals - so the engine is straightforward to unit test
@@ -25,7 +32,7 @@ class GameEngine:
     """
 
     def __init__(self, board, rule_engine, arbiter, win_condition, config,
-                 move_log, scoreboard, observers=()):
+                 move_log, scoreboard, bus):
         self._board = board
         self._rule_engine = rule_engine
         self._arbiter = arbiter
@@ -33,12 +40,13 @@ class GameEngine:
         self._config = config
         self._move_log = move_log
         self._scoreboard = scoreboard
-        self._observers = list(observers)
+        self._bus = bus
         self._game_over = False
 
-    def subscribe(self, observer):
-        """Register a GameObserver to receive events from here on."""
-        self._observers.append(observer)
+    def start(self):
+        """Announce that the game is open to commands. Nothing here waits for
+        it; it exists so anything that opens on a new game has a cue."""
+        self._bus.publish(GameStarted(at_ms=self._arbiter.clock))
 
     @property
     def game_over(self):
@@ -125,7 +133,7 @@ class GameEngine:
 
         piece = self._board.get(*cell)
         self._arbiter.start_jump(piece, cell)
-        self._apply_events([JumpEvent(piece, cell, self._arbiter.clock)])
+        self._bus.publish(JumpStarted(piece, cell, self._arbiter.clock))
         return MoveResult(True, Reason.OK)
 
     def wait(self, dt):
@@ -191,16 +199,33 @@ class GameEngine:
 
     # -- internal helpers -------------------------------------------------
 
-    def _apply_events(self, events):
-        """React to arrivals reported by the arbiter.
+    def _apply_events(self, arrivals):
+        """Publish what the arbiter reports, as game events.
 
-        Anything that merely records what happened (the move log, the score, a
-        future broadcast to remote clients) is an observer's job, so the engine
-        just announces. Game over stays here: it is not a side effect but a
-        guard the engine itself enforces on every later command.
+        Recording any of it (the move log, the score, a broadcast to remote
+        clients) is a subscriber's job. Game over stays here: it is not a side
+        effect but a guard the engine enforces on every later command.
         """
-        for event in events:
-            for observer in self._observers:
-                observer.on_event(event)
-            if self._win_condition.is_game_over(event.captured):
-                self._game_over = True
+        for arrival in arrivals:
+            self._publish_arrival(arrival)
+
+    def _publish_arrival(self, arrival):
+        # From the specific to the general, so no subscriber sees a conclusion
+        # before its cause.
+        self._bus.publish(MoveCompleted(
+            piece=arrival.piece,
+            origin=arrival.origin,
+            destination=arrival.destination,
+            captured=arrival.captured,
+            at_ms=arrival.at_ms,
+        ))
+        if arrival.captured is not None:
+            self._bus.publish(PieceCaptured(
+                captor=arrival.piece,
+                captured=arrival.captured,
+                cell=arrival.destination,
+                at_ms=arrival.at_ms,
+            ))
+        if not self._game_over and self._win_condition.is_game_over(arrival.captured):
+            self._game_over = True
+            self._bus.publish(GameEnded(winner=arrival.piece[0], at_ms=arrival.at_ms))

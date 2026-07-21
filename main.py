@@ -7,6 +7,7 @@ from __future__ import annotations
 import sys
 
 from config import settings
+from events.bus import EventBus
 from game.composition import build_registry, build_game
 from game.parser import parse_input
 from board.loaders import load_text_board, BoardParseError
@@ -25,8 +26,9 @@ def run(input_lines, config=settings):
         print("ERROR", error)
         return
 
-    engine, controller = build_game(board, registry, config)
+    engine, controller = build_game(board, registry, config, EventBus())
     renderer = BoardRenderer()
+    engine.start()
 
     for command in commands:
         _dispatch(command, engine, controller, renderer)

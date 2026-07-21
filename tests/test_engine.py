@@ -13,8 +13,15 @@ from game.engine import GameEngine
 from game.move_log import MoveLog
 from game.scoreboard import Scoreboard
 from game.notation import CoordinateNotation
-from game.models import JumpEvent
-from game.observers import GameObserver, MoveRecorder, CaptureScorer
+from game.subscribers import MoveRecorder, CaptureScorer
+from game.events import (
+    GameStarted,
+    MoveCompleted,
+    PieceCaptured,
+    JumpStarted,
+    GameEnded,
+)
+from events.bus import EventBus
 from rules.reasons import Reason
 from view.renderer import BoardRenderer
 
@@ -49,7 +56,7 @@ class _ConfigOverride:
         return getattr(object.__getattribute__(self, "_base"), name)
 
 
-def make_engine(rows, win_condition=None, promotion_rule=None, config=settings):
+def make_engine(rows, win_condition=None, promotion_rule=None, config=settings, bus=None):
     board = Board(rows, ".")
     registry = build_default_registry(config)
     arbiter = RealTimeArbiter(
@@ -59,6 +66,9 @@ def make_engine(rows, win_condition=None, promotion_rule=None, config=settings):
     )
     move_log = MoveLog()
     scoreboard = Scoreboard(config.COLORS)
+    bus = bus or EventBus()
+    bus.subscribe(MoveCompleted, MoveRecorder(move_log, CoordinateNotation(board.height)).record)
+    bus.subscribe(PieceCaptured, CaptureScorer(scoreboard, config.PIECE_VALUES).award)
     engine = GameEngine(
         board=board,
         rule_engine=RuleEngine(rule_registry=registry, config=config),
@@ -67,10 +77,7 @@ def make_engine(rows, win_condition=None, promotion_rule=None, config=settings):
         config=config,
         move_log=move_log,
         scoreboard=scoreboard,
-        observers=(
-            MoveRecorder(move_log, CoordinateNotation(board.height)),
-            CaptureScorer(scoreboard, config.PIECE_VALUES),
-        ),
+        bus=bus,
     )
     return engine, board
 
@@ -357,41 +364,89 @@ def test_completed_move_is_recorded_in_the_move_log():
     assert entries[0].time_ms == 2 * settings.MOVE_DURATION
 
 
-def test_a_subscribed_observer_receives_completed_moves():
+def subscribe_all(bus):
+    """Record every published event, in the order the engine published it."""
+    seen = []
+    for event_type in (GameStarted, MoveCompleted, PieceCaptured, GameEnded, JumpStarted):
+        bus.subscribe(event_type, seen.append)
+    return seen
+
+
+def test_a_completed_move_is_published():
     # The extension point: a new consumer attaches without the engine knowing
     # anything about it.
+    bus = EventBus()
     seen = []
-
-    class Spy(GameObserver):
-        def on_event(self, event):
-            seen.append(event)
-
-    engine, _ = make_engine([["wR", ".", "bP"], [".", ".", "."], [".", ".", "."]])
-    engine.subscribe(Spy())
+    bus.subscribe(MoveCompleted, seen.append)
+    engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]], bus=bus)
     engine.request_move((0, 0), (0, 2))
     engine.wait(2 * settings.MOVE_DURATION)
 
     assert len(seen) == 1
     assert seen[0].destination == (0, 2)
-    assert seen[0].captured == "bP"
     assert seen[0].at_ms == 2 * settings.MOVE_DURATION
 
 
-def test_a_jump_announces_a_jump_event_immediately():
+def test_a_move_without_a_capture_publishes_no_capture():
+    bus = EventBus()
+    seen = []
+    bus.subscribe(PieceCaptured, seen.append)
+    engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]], bus=bus)
+    engine.request_move((0, 0), (0, 2))
+    engine.wait(2 * settings.MOVE_DURATION)
+
+    assert seen == []
+
+
+def test_an_arrival_publishes_its_events_from_the_specific_to_the_general():
+    # The guaranteed order: no subscriber sees a conclusion before its cause.
+    bus = EventBus()
+    seen = subscribe_all(bus)
+    engine, _ = make_engine([["wR", ".", "bK"], [".", ".", "."], [".", ".", "."]], bus=bus)
+    engine.request_move((0, 0), (0, 2))
+    engine.wait(2 * settings.MOVE_DURATION)
+
+    assert [type(event) for event in seen] == [MoveCompleted, PieceCaptured, GameEnded]
+    assert seen[1].captor == "wR" and seen[1].captured == "bK"
+    assert seen[2].winner == "w"
+
+
+def test_the_game_ends_once_however_many_kings_fall_together():
+    # Both sides can be in flight at once, so two arrivals may end the game in
+    # the same batch - the second is not a second ending.
+    bus = EventBus()
+    seen = []
+    bus.subscribe(GameEnded, seen.append)
+    engine, _ = make_engine(
+        [["wR", ".", "bK"], [".", ".", "."], ["bR", ".", "wK"]], bus=bus
+    )
+    engine.request_move((0, 0), (0, 2))
+    engine.request_move((2, 0), (2, 2))
+    engine.wait(2 * settings.MOVE_DURATION)
+
+    assert len(seen) == 1
+
+
+def test_start_announces_the_game_is_open():
+    bus = EventBus()
+    seen = []
+    bus.subscribe(GameStarted, seen.append)
+    engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]], bus=bus)
+    engine.start()
+
+    assert len(seen) == 1
+
+
+def test_a_jump_is_published_immediately():
     # A jump is reported the instant it is accepted, not on landing, so a
     # listener (e.g. a sound) reacts at take-off.
+    bus = EventBus()
     seen = []
-
-    class Spy(GameObserver):
-        def on_event(self, event):
-            seen.append(event)
-
-    engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
-    engine.subscribe(Spy())
+    bus.subscribe(JumpStarted, seen.append)
+    engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]], bus=bus)
     engine.request_jump((0, 0))
 
     assert len(seen) == 1
-    assert isinstance(seen[0], JumpEvent)
     assert seen[0].piece == "wR"
     assert seen[0].cell == (0, 0)
 

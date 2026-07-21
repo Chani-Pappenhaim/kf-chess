@@ -17,7 +17,8 @@ from game.controller import Controller
 from game.move_log import MoveLog
 from game.scoreboard import Scoreboard
 from game.notation import CoordinateNotation
-from game.observers import MoveRecorder, CaptureScorer
+from game.subscribers import MoveRecorder, CaptureScorer
+from game.events import MoveCompleted, PieceCaptured
 
 
 def build_registry(config):
@@ -26,11 +27,13 @@ def build_registry(config):
     return build_default_registry(config)
 
 
-def build_engine(board, registry, config):
+def build_engine(board, registry, config, bus):
     """Wire the GameEngine around an already-loaded board.
 
     The log and the scoreboard are built here once and handed to both sides: to
-    an observer that writes to them, and to the engine that exposes them to read.
+    the subscriber that writes to them, and to the engine that exposes them to
+    read. The event map below is the whole of what the game listens to itself;
+    presentation subscribers are added by the entry point that wants them.
     """
     arbiter = RealTimeArbiter(
         board=board,
@@ -39,6 +42,12 @@ def build_engine(board, registry, config):
     )
     move_log = MoveLog()
     scoreboard = Scoreboard(config.COLORS)
+    bus.subscribe(
+        MoveCompleted, MoveRecorder(move_log, CoordinateNotation(board.height)).record
+    )
+    bus.subscribe(
+        PieceCaptured, CaptureScorer(scoreboard, config.PIECE_VALUES).award
+    )
     return GameEngine(
         board=board,
         rule_engine=RuleEngine(rule_registry=registry, config=config),
@@ -47,19 +56,16 @@ def build_engine(board, registry, config):
         config=config,
         move_log=move_log,
         scoreboard=scoreboard,
-        observers=(
-            MoveRecorder(move_log, CoordinateNotation(board.height)),
-            CaptureScorer(scoreboard, config.PIECE_VALUES),
-        ),
+        bus=bus,
     )
 
 
-def build_game(board, registry, config, board_origin=(0, 0)):
+def build_game(board, registry, config, bus, board_origin=(0, 0)):
     """build_engine plus a Controller, for an entry point that takes input.
 
     `board_origin` is the board's top-left pixel: (0, 0) for the text path, the
     framed offset for the graphical one, so clicks resolve to the right cell.
     """
-    engine = build_engine(board, registry, config)
+    engine = build_engine(board, registry, config, bus)
     controller = Controller(engine, BoardMapper(board, config.CELL_SIZE, board_origin))
     return engine, controller
