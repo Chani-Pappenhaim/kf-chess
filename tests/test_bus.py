@@ -16,8 +16,7 @@ class Beta:
 
 
 def collector():
-    """A subscriber that only records what it was handed. A plain function -
-    the bus asks nothing of a subscriber but that it be callable."""
+    """A subscriber that only records what it was handed."""
     seen = []
     return seen, seen.append
 
@@ -60,13 +59,10 @@ def test_one_subscriber_may_take_several_types():
 
 
 def test_publishing_with_nobody_listening_is_silent():
-    # A publisher is never aware of who, or whether anyone, is subscribed.
     EventBus().publish(Alpha())
 
 
 def test_a_raising_subscriber_is_not_contained():
-    # A subscriber that fails is a bug to surface; containment, where wanted,
-    # is the subscriber's own to arrange.
     bus = EventBus()
 
     def broken(event):
