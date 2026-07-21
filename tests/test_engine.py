@@ -24,6 +24,7 @@ from game.events import (
 from events.bus import EventBus
 from rules.reasons import Reason
 from view.renderer import BoardRenderer
+from view.render_model import MOVE_STATE
 
 
 class NeverEndsWinCondition(WinCondition):
@@ -370,6 +371,26 @@ def subscribe_all(bus):
     for event_type in (GameStarted, MoveCompleted, PieceCaptured, GameEnded, JumpStarted):
         bus.subscribe(event_type, seen.append)
     return seen
+
+
+def test_a_piece_stops_being_selectable_the_instant_it_is_commanded():
+    # No time has passed and the piece has not travelled a pixel, but the
+    # arbiter already holds the motion - so the model reports it as moving
+    # rather than idle, and there is no window in which it reads as free.
+    engine, _ = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
+    assert engine.render_model().selectable((0, 0)) is True
+
+    engine.request_move((0, 0), (0, 2))
+    model = engine.render_model()
+    assert model.selectable((0, 0)) is False
+    assert model.pieces[0].state == MOVE_STATE
+    assert model.pieces[0].progress == 0.0
+
+
+def test_a_jumping_piece_stops_being_selectable_at_take_off():
+    engine, _ = make_engine([["wR", ".", "."]])
+    engine.request_jump((0, 0))
+    assert engine.render_model().selectable((0, 0)) is False
 
 
 def test_a_moving_piece_is_listed_on_the_cell_it_occupies():
