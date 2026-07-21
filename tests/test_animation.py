@@ -47,3 +47,13 @@ def test_subscribe_banner_wires_both_events():
     assert banner.text_at(0) == settings.START_BANNER_TEXT
     bus.publish(GameEnded(winner="w", at_ms=50))
     assert banner.text_at(50) == "WHITE WINS"
+
+
+def test_text_and_expiry_are_swapped_as_one():
+    # The text and its expiry are held as a single value, so a reader on another
+    # thread can never catch a new text paired with an old expiry. Reading the
+    # field twice must yield a consistent pair.
+    banner = BannerAnimation(settings)
+    banner.announce_start(GameStarted(at_ms=1000))
+    showing = banner._showing
+    assert showing == (settings.START_BANNER_TEXT, 1000 + settings.START_BANNER_MS)

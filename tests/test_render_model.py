@@ -88,3 +88,11 @@ def test_piece_at_reports_an_empty_square_as_nothing_there():
     model = play.build_engine(settings).render_model()
     assert model.piece_at((4, 4)) is None
     assert model.selectable((4, 4)) is False
+
+
+def test_in_bounds_knows_the_squares_of_this_board():
+    model = play.build_engine(settings).render_model()
+    assert model.in_bounds(0, 0) and model.in_bounds(7, 7)
+    assert not model.in_bounds(-1, 0)
+    assert not model.in_bounds(8, 0)
+    assert not model.in_bounds(0, 8)

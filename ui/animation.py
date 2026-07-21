@@ -2,19 +2,25 @@
 
 A subscriber that keeps only what to show and until when. The Hud asks it each
 frame, so the drawing stays in the Hud and the timing stays here.
+
+The two facts - the text and how long it lasts - are held as one tuple, and
+replaced in a single assignment. A subscriber fires on the network thread while
+the Hud reads on the frame thread, so text and expiry must never be seen from
+two different banners: swapping the pair in one step is what guarantees that,
+without a lock.
 """
 from __future__ import annotations
 
 from game.events import GameStarted, GameEnded
 
 _FOREVER = float("inf")
+_NOTHING = (None, 0)  # no text, and an expiry no clock reading is below
 
 
 class BannerAnimation:
     def __init__(self, config):
         self._config = config
-        self._text = None
-        self._until = 0
+        self._showing = _NOTHING  # (text, expiry_ms)
 
     def announce_start(self, event):
         self._show(
@@ -27,12 +33,12 @@ class BannerAnimation:
 
     def text_at(self, clock):
         """What to draw now, or None when nothing is showing. Before the first
-        event `_until` is 0, so no clock reading can bring a banner up."""
-        return self._text if clock < self._until else None
+        event the expiry is 0, so no clock reading can bring a banner up."""
+        text, until = self._showing
+        return text if clock < until else None
 
     def _show(self, text, until):
-        self._text = text
-        self._until = until
+        self._showing = (text, until)
 
 
 def subscribe_banner(bus, config):

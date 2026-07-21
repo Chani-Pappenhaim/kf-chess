@@ -114,3 +114,6 @@ SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}"
 # lives on the server alone, so this is the only place time passes: clients
 # draw what they are sent and never advance anything themselves.
 SERVER_TICK_MS = 33
+
+# Shown in the client's window until the server sends the first state.
+CONNECTING_TEXT = "connecting..."

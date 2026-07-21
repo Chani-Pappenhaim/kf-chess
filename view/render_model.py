@@ -41,6 +41,11 @@ class RenderModel:
     moves: tuple = ()  # MoveRecord per completed move, in order (both colors)
     scores: dict = field(default_factory=dict)  # {color: accumulated points}
 
+    def in_bounds(self, row, col):
+        """Whether `(row, col)` is a square of this board at all - the question
+        a click has to answer before it can mean anything."""
+        return 0 <= row < self.height and 0 <= col < self.width
+
     def piece_at(self, cell):
         """The piece occupying `cell`, or None when the square is empty.
 
