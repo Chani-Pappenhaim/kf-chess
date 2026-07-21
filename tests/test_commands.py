@@ -1,6 +1,7 @@
 import pytest
 
-from protocol.commands import MoveCommand, ProtocolError, format_move, parse_move
+from protocol.commands import MoveCommand, format_move, parse_move
+from protocol.errors import ProtocolError
 
 
 def test_a_move_is_written_in_the_form_the_wire_expects():

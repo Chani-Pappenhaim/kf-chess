@@ -12,12 +12,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from game.squares import SquareError, cell_of, square_of
+from protocol.errors import ProtocolError
 
 PREFIX_LENGTH = 2  # colour + piece kind, ahead of the two squares
-
-
-class ProtocolError(ValueError):
-    """Raised when text cannot be read as the message it claims to be."""
 
 
 @dataclass(frozen=True)
