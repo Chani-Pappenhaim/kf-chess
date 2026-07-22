@@ -10,6 +10,8 @@ tell which of the two it is drawing.
 """
 from __future__ import annotations
 
+from getpass import getpass
+
 from client.gateway import NetworkGateway
 from client.identity import Identity
 from client.inbox import Inbox
@@ -37,19 +39,22 @@ def build_client(config=settings):
     return inbox, bus, identity, socket, gateway
 
 
-def run(config=settings, prompt=input):  # pragma: no cover - real-time GUI loop
-    username = prompt("username: ").strip() or "guest"
+def run(config=settings, ask=input, ask_secret=getpass):  # pragma: no cover - real-time GUI loop
+    # Login is asked in the shell, not the window; the password is read without
+    # echo. A new username registers, a known one must match.
+    username = ask("username: ").strip() or "guest"
+    password = ask_secret("password: ")
     inbox, bus, identity, socket, gateway = build_client(config)
 
     socket.start()
-    socket.send(encode(Login(username)))  # the opening line the server expects
+    socket.send(encode(Login(username, password)))  # the opening line the server expects
 
     window = Window(config.WINDOW_TITLE)
     try:
         model = wait_for_state(window, inbox, identity, config)
         if model is None:
             if identity.rejected():
-                print("the game already has two players")
+                print(identity.rejection_reason())
             return
 
         # The model gives the board's extent, which is all the mapper needs; the

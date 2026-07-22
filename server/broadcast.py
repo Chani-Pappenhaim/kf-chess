@@ -29,14 +29,14 @@ def subscribe_broadcast(bus, send):
         bus.subscribe(event_type, relay)
 
 
-def broadcast_state(engine, players, send):
+def broadcast_state(engine, players, ratings, send):
     """Send the whole state as it stands right now.
 
-    The player names are the server's, not the engine's, so they are folded into
-    the model here at the boundary rather than inside a game that has no notion
-    of players. Whole state, not the difference from last time: a client that
-    misses one is corrected by the next, and one just connected needs no catching
-    up beyond a single line.
+    Player names and ratings are the server's, not the engine's, so they are
+    folded into the model here at the boundary rather than inside a game that has
+    no notion of players. Whole state, not the difference from last time: a
+    client that misses one is corrected by the next, and one just connected needs
+    no catching up beyond a single line.
     """
-    model = replace(engine.render_model(), players=players)
+    model = replace(engine.render_model(), players=players, ratings=ratings)
     send(encode(StateUpdate(encode_model(model))))

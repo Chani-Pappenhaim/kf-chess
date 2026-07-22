@@ -21,10 +21,12 @@ from protocol.records import by_name, decode_record, encode_record
 
 @dataclass(frozen=True)
 class Login:
-    """The first thing a client says: who is joining. Sent before any command,
-    so the server can hand out a colour before it takes orders."""
+    """The first thing a client says: who is joining, and their password. Sent
+    before any command, so the server can authenticate and hand out a colour
+    before it takes orders."""
 
     username: str
+    password: str
 
 
 @dataclass(frozen=True)

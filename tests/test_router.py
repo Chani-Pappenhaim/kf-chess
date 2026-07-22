@@ -85,7 +85,8 @@ def test_a_welcome_tells_this_client_its_colour():
     assert identity.color() == "b"
 
 
-def test_a_rejection_is_recorded_so_the_client_can_give_up():
+def test_a_rejection_is_recorded_with_its_reason_so_the_client_can_give_up():
     _inbox, _bus, identity, router = routed()
-    router.route(encode(Rejected("full")))
+    router.route(encode(Rejected("wrong password")))
     assert identity.rejected() is True
+    assert identity.rejection_reason() == "wrong password"

@@ -70,9 +70,12 @@ class Hud:
         canvas.put_text(white, self._centered(white), self._bottom_score_baseline, 0.9, _TEXT, 2)
 
     def _name_and_score(self, color, model):
+        # "dana (1516)  Score: 5" networked; "Score: 5" alone in a local game,
+        # where there is no player account and so no name or rating.
         name = model.players.get(color, "")
-        prefix = f"{name}  " if name else ""
-        return f"{prefix}Score: {model.scores.get(color, 0)}"
+        rating = model.ratings.get(color)
+        who = f"{name} ({rating})  " if name and rating is not None else (f"{name}  " if name else "")
+        return f"{who}Score: {model.scores.get(color, 0)}"
 
     def _draw_coordinates(self, canvas, model):
         """The a-h files above and below the board, and the ranks down each side

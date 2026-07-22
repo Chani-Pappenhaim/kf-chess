@@ -16,15 +16,15 @@ class Identity:
     def __init__(self):
         self._lock = threading.Lock()
         self._color = None
-        self._rejected = False
+        self._rejection = None  # the reason string, once turned away
 
     def welcome(self, color):
         with self._lock:
             self._color = color
 
-    def reject(self):
+    def reject(self, reason):
         with self._lock:
-            self._rejected = True
+            self._rejection = reason
 
     def color(self):
         """This client's colour, or None before the welcome arrives."""
@@ -32,6 +32,11 @@ class Identity:
             return self._color
 
     def rejected(self):
-        """Whether the server turned this client away - the game was full."""
+        """Whether the server turned this client away (wrong password, or full)."""
         with self._lock:
-            return self._rejected
+            return self._rejection is not None
+
+    def rejection_reason(self):
+        """Why the server turned this client away, or None if it did not."""
+        with self._lock:
+            return self._rejection

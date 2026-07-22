@@ -63,5 +63,5 @@ def test_a_rejected_client_stops_waiting():
     # Turned away by a full server: the wait ends, and the caller learns why
     # from the same identity.
     identity = Identity()
-    identity.reject()
+    identity.reject("wrong password")
     assert wait_for_state(_FakeWindow(), Inbox(), identity, settings) is None

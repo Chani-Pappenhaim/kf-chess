@@ -46,11 +46,22 @@ def test_hud_shows_the_title_and_both_scores():
     assert "Score: 3" in canvas.texts  # black, above the board
 
 
-def test_hud_shows_each_players_name_with_their_score():
+def test_hud_shows_each_players_name_rating_and_score():
     canvas = _canvas()
-    _hud().draw(canvas, _model(scores={"w": 5, "b": 3}, players={"w": "dana", "b": "yossi"}))
-    assert "dana  Score: 5" in canvas.texts    # white, below
-    assert "yossi  Score: 3" in canvas.texts   # black, above
+    _hud().draw(canvas, _model(
+        scores={"w": 5, "b": 3},
+        players={"w": "dana", "b": "yossi"},
+        ratings={"w": 1516, "b": 1484},
+    ))
+    assert "dana (1516)  Score: 5" in canvas.texts    # white, below
+    assert "yossi (1484)  Score: 3" in canvas.texts   # black, above
+
+
+def test_hud_shows_the_name_alone_when_a_rating_is_missing():
+    # A named player whose rating has not arrived yet: name, no parentheses.
+    canvas = _canvas()
+    _hud().draw(canvas, _model(scores={"w": 5}, players={"w": "dana"}))
+    assert "dana  Score: 5" in canvas.texts
 
 
 def test_hud_shows_a_bare_score_when_no_one_has_that_colour():

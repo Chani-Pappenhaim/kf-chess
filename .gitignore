@@ -39,3 +39,6 @@ Thumbs.db
 # Local sprite-prep tooling (not part of the project)
 slice_sprites.py
 remove_background.py
+
+# Local SQLite accounts database
+accounts.db

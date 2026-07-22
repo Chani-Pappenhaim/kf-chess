@@ -41,6 +41,7 @@ class RenderModel:
     moves: tuple = ()  # MoveRecord per completed move, in order (both colors)
     scores: dict = field(default_factory=dict)  # {color: accumulated points}
     players: dict = field(default_factory=dict)  # {color: username}, empty locally
+    ratings: dict = field(default_factory=dict)  # {color: ELO rating}, networked only
 
     def in_bounds(self, row, col):
         """Whether `(row, col)` is a square of this board at all - the question

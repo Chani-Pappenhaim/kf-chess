@@ -52,7 +52,7 @@ class MessageRouter:
         self._identity.welcome(message.color)
 
     def _rejected(self, message):
-        self._identity.reject()
+        self._identity.reject(message.reason)
 
     def _state(self, message):
         self._inbox.receive_state(decode_model(message.state))

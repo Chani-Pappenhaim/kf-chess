@@ -117,3 +117,10 @@ SERVER_TICK_MS = 33
 
 # Shown in the client's window until the server sends the first state.
 CONNECTING_TEXT = "connecting..."
+
+# Accounts, saved on the server. Every new player starts at STARTING_RATING and
+# moves by ELO after each game; ELO_K_FACTOR is how far a single result can shift
+# a rating. Only server-side account handling reads these.
+ACCOUNTS_DB = os.path.join(_PROJECT_ROOT, "accounts.db")
+STARTING_RATING = 1200
+ELO_K_FACTOR = 32

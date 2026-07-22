@@ -69,3 +69,8 @@ def test_a_finished_game_crosses_as_finished():
 def test_player_names_cross_with_the_state():
     model = RenderModel(pieces=(), width=8, height=8, players={"w": "dana", "b": "yossi"})
     assert decode_model(encode_model(model)).players == {"w": "dana", "b": "yossi"}
+
+
+def test_player_ratings_cross_with_the_state():
+    model = RenderModel(pieces=(), width=8, height=8, ratings={"w": 1516, "b": 1484})
+    assert decode_model(encode_model(model)).ratings == {"w": 1516, "b": 1484}

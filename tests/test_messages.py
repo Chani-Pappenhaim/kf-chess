@@ -22,7 +22,7 @@ from protocol.messages import (
 from protocol.state import decode_model, encode_model
 
 SAMPLES = (
-    Login("dana"),
+    Login("dana", "open sesame"),
     MoveRequest("WQe2e5"),
     JumpRequest("e4"),
     HintsRequest("e2"),

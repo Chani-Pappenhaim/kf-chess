@@ -11,20 +11,21 @@ from protocol.messages import (
 )
 from protocol.state import decode_model
 from server.__main__ import build_service
+from tests.support import FakeAccountStore
 
 
-def service():
-    """The real graph the server runs, minus the socket."""
-    return build_service(settings)
+def service(store=None):
+    """The real graph the server runs, minus the socket and the real database."""
+    return build_service(settings, store=store or FakeAccountStore(settings.STARTING_RATING))
 
 
 def lines(outbox):
     return [line for _target, line in outbox.drain()]
 
 
-def admit(game, username, send=lambda line: None):
+def admit(game, username, password="pw", send=lambda line: None):
     """Seat one client and return its session plus the decoded reply lines."""
-    session, replies = game.admit(encode(Login(username)), send)
+    session, replies = game.admit(encode(Login(username, password)), send)
     return session, [decode(line) for line in replies]
 
 
@@ -121,3 +122,44 @@ def test_an_event_from_play_reaches_the_outbox():
 
     kinds = [type(decode(line)).__name__ for line in lines(outbox)]
     assert "EventNotice" in kinds
+
+
+def test_a_new_username_registers_and_is_admitted():
+    _engine, _outbox, game = service()
+    session, replies = admit(game, "dana", password="secret")
+    assert session is not None
+    assert replies[0] == Welcome("w")
+
+
+def test_a_returning_user_with_the_right_password_is_admitted():
+    store = FakeAccountStore(settings.STARTING_RATING)
+    store.register("dana", "secret")
+    _engine, _outbox, game = service(store)
+    session, _ = admit(game, "dana", password="secret")
+    assert session is not None
+
+
+def test_a_returning_user_with_the_wrong_password_is_refused():
+    store = FakeAccountStore(settings.STARTING_RATING)
+    store.register("dana", "secret")
+    _engine, _outbox, game = service(store)
+    session, replies = admit(game, "dana", password="wrong")
+    assert session is None
+    assert replies[0] == Rejected("wrong password")
+
+
+def test_a_wrong_password_does_not_take_a_seat():
+    store = FakeAccountStore(settings.STARTING_RATING)
+    store.register("dana", "secret")
+    _engine, _outbox, game = service(store)
+    admit(game, "dana", password="wrong")             # refused
+    good, _ = admit(game, "dana", password="secret")  # the seat was never taken
+    assert good.color == "w"
+
+
+def test_the_state_carries_each_players_rating():
+    _engine, outbox, game = service()
+    admit(game, "dana")
+    game.tick(settings.MOVE_DURATION)
+    state = decode(lines(outbox)[-1])
+    assert decode_model(state.state).ratings == {"w": settings.STARTING_RATING}
