@@ -126,6 +126,17 @@ SERVER_STOPPED_MESSAGE = "server stopped"
 REJECT_WRONG_PASSWORD = "wrong password"
 REJECT_GAME_FULL = "the game already has two players"
 
+# Printed in the shell once the server answers a login, so a player knows whether
+# a fresh account was made or a known one was recognised.
+ACCOUNT_CREATED_MESSAGE = "account created - welcome, {name}!"
+WELCOME_BACK_MESSAGE = "welcome back, {name}!"
+
+# Drawn on the score strip. The rating gets its own label rather than parentheses
+# so it reads as the standing it is; the marker tags the strip that is you (kept
+# ASCII, as the cv2 text renderer draws no Hebrew).
+RATING_LABEL = "Rating"
+YOU_MARKER = "  <- you"
+
 # Accounts, saved on the server. Every new player starts at STARTING_RATING and
 # moves by ELO after each game; ELO_K_FACTOR is how far a single result can shift
 # a rating. Only server-side account handling reads these.

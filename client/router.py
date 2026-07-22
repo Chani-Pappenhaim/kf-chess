@@ -49,7 +49,7 @@ class MessageRouter:
         action(message)
 
     def _welcome(self, message):
-        self._identity.welcome(message.color)
+        self._identity.welcome(message.color, message.new_account)
 
     def _rejected(self, message):
         self._identity.reject(message.reason)

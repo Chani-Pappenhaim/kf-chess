@@ -55,11 +55,13 @@ class HintsRequest:
 
 @dataclass(frozen=True)
 class Welcome:
-    """The answer to a Login: the colour this client was given. It is the one
-    thing a client cannot read off the state, since the state names players but
-    not which of them is you."""
+    """The answer to a Login: the colour this client was given, and whether the
+    login just created the account or matched an existing one. The colour is the
+    one thing a client cannot read off the state, since the state names players
+    but not which of them is you; new_account only shapes the greeting shown."""
 
     color: str
+    new_account: bool = False
 
 
 @dataclass(frozen=True)

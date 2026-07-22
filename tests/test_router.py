@@ -83,6 +83,13 @@ def test_a_welcome_tells_this_client_its_colour():
     _inbox, _bus, identity, router = routed()
     router.route(encode(Welcome("b")))
     assert identity.color() == "b"
+    assert identity.new_account() is False  # the default when the flag is unset
+
+
+def test_a_welcome_says_whether_the_login_created_the_account():
+    _inbox, _bus, identity, router = routed()
+    router.route(encode(Welcome("w", True)))
+    assert identity.new_account() is True
 
 
 def test_a_rejection_is_recorded_with_its_reason_so_the_client_can_give_up():

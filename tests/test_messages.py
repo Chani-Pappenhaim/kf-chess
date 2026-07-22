@@ -26,7 +26,7 @@ SAMPLES = (
     MoveRequest("WQe2e5"),
     JumpRequest("e4"),
     HintsRequest("e2"),
-    Welcome("w"),
+    Welcome("w", True),
     Rejected("full"),
     StateUpdate({"pieces": []}),
     EventNotice({"name": "GameStarted", "fields": {"at_ms": 0}}),

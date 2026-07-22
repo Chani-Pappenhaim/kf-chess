@@ -16,11 +16,18 @@ class Identity:
     def __init__(self):
         self._lock = threading.Lock()
         self._color = None
+        self._new_account = False  # whether the login just created the account
         self._rejection = None  # the reason string, once turned away
 
-    def welcome(self, color):
+    def welcome(self, color, new_account=False):
         with self._lock:
             self._color = color
+            self._new_account = new_account
+
+    def new_account(self):
+        """Whether the welcome said this login created a fresh account."""
+        with self._lock:
+            return self._new_account
 
     def reject(self, reason):
         with self._lock:

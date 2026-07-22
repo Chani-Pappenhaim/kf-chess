@@ -53,8 +53,21 @@ def test_hud_shows_each_players_name_rating_and_score():
         players={"w": "dana", "b": "yossi"},
         ratings={"w": 1516, "b": 1484},
     ))
-    assert "dana (1516)  Score: 5" in canvas.texts    # white, below
-    assert "yossi (1484)  Score: 3" in canvas.texts   # black, above
+    assert "dana  Rating 1516  Score: 5" in canvas.texts    # white, below
+    assert "yossi  Rating 1484  Score: 3" in canvas.texts   # black, above
+
+
+def test_hud_marks_only_the_local_players_side():
+    canvas = _canvas()
+    hud = Hud(settings, _NoBanner(), own_color="w")
+    hud.draw(canvas, _model(
+        scores={"w": 5, "b": 3},
+        players={"w": "dana", "b": "yossi"},
+        ratings={"w": 1516, "b": 1484},
+    ))
+    joined = " | ".join(canvas.texts)
+    assert f"dana  Rating 1516  Score: 5{settings.YOU_MARKER}" in canvas.texts
+    assert f"yossi  Rating 1484  Score: 3{settings.YOU_MARKER}" not in joined
 
 
 def test_hud_shows_the_name_alone_when_a_rating_is_missing():

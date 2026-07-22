@@ -58,7 +58,7 @@ def test_a_third_player_is_turned_away():
 def test_admission_answers_with_a_colour_and_the_state():
     _engine, _outbox, game = service()
     _session, replies = admit(game, "dana")
-    assert replies[0] == Welcome("w")
+    assert replies[0] == Welcome("w", True)  # a fresh name, so a new account
     assert isinstance(replies[1], StateUpdate)
 
 
@@ -128,15 +128,16 @@ def test_a_new_username_registers_and_is_admitted():
     _engine, _outbox, game = service()
     session, replies = admit(game, "dana", password="secret")
     assert session is not None
-    assert replies[0] == Welcome("w")
+    assert replies[0] == Welcome("w", True)  # the welcome says the account is new
 
 
 def test_a_returning_user_with_the_right_password_is_admitted():
     store = FakeAccountStore(settings.STARTING_RATING)
     store.register("dana", "secret")
     _engine, _outbox, game = service(store)
-    session, _ = admit(game, "dana", password="secret")
+    session, replies = admit(game, "dana", password="secret")
     assert session is not None
+    assert replies[0] == Welcome("w", False)  # a known name, not a new account
 
 
 def test_a_returning_user_with_the_wrong_password_is_refused():

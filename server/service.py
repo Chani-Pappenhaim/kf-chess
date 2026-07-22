@@ -50,23 +50,24 @@ class GameService:
         login = self._read_login(opening)
         if login is None:
             return None, ()
-        account = self._account_for(login)
+        new_account = not self._store.exists(login.username)
+        account = self._account_for(login, new_account)
         if account is None:
             return None, (encode(Rejected(self._config.REJECT_WRONG_PASSWORD)),)
         color = self._registry.seat(account)
         if color is None:
             return None, (encode(Rejected(self._config.REJECT_GAME_FULL)),)
         session = CommandHandler(self._engine, self._height, send, color)
-        return session, (encode(Welcome(color)), self._state_line())
+        return session, (encode(Welcome(color, new_account)), self._state_line())
 
     def depart(self, session):
         """Free a player's colour when they disconnect, so the seat reopens."""
         self._registry.leave(session.color)
 
-    def _account_for(self, login):
+    def _account_for(self, login, new_account):
         """The account this login is for: a fresh registration for a new name, or
         the matched account for an existing one - None when the password is wrong."""
-        if not self._store.exists(login.username):
+        if new_account:
             return self._store.register(login.username, login.password)
         return self._store.authenticate(login.username, login.password)
 

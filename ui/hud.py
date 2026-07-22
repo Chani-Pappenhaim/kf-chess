@@ -24,13 +24,16 @@ _BANNER_CHAR_PX = 46               # the same, at the banner's larger text scale
 
 
 class Hud:
-    def __init__(self, config, banner):
+    def __init__(self, config, banner, own_color=None):
         self._bx = config.BOARD_ORIGIN_X
         self._by = config.BOARD_ORIGIN_Y
         self._cell = config.CELL_SIZE
         self._board_px = config.BOARD_PX
         self._gutter = config.COORD_GUTTER
         self._title = config.WINDOW_TITLE
+        self._own_color = own_color  # which side is this player's; None in local play
+        self._rating_label = config.RATING_LABEL
+        self._you_marker = config.YOU_MARKER
         self._title_baseline = config.TITLE_HEIGHT - 16
         self._top_score_baseline = config.TITLE_HEIGHT + config.SCORE_HEIGHT - 12
         self._bottom_score_baseline = (
@@ -70,12 +73,18 @@ class Hud:
         canvas.put_text(white, self._centered(white), self._bottom_score_baseline, 0.9, _TEXT, 2)
 
     def _name_and_score(self, color, model):
-        # "dana (1516)  Score: 5" networked; "Score: 5" alone in a local game,
-        # where there is no player account and so no name or rating.
+        # "dana  Rating 1516  Score: 5" networked; "Score: 5" alone in a local
+        # game, where there is no player account and so no name or rating. The
+        # player's own strip is tagged so a glance tells which side is theirs.
         name = model.players.get(color, "")
         rating = model.ratings.get(color)
-        who = f"{name} ({rating})  " if name and rating is not None else (f"{name}  " if name else "")
-        return f"{who}Score: {model.scores.get(color, 0)}"
+        who = (
+            f"{name}  {self._rating_label} {rating}  "
+            if name and rating is not None
+            else (f"{name}  " if name else "")
+        )
+        line = f"{who}Score: {model.scores.get(color, 0)}"
+        return line + self._you_marker if color == self._own_color else line
 
     def _draw_coordinates(self, canvas, model):
         """The a-h files above and below the board, and the ranks down each side

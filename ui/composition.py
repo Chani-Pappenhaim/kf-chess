@@ -40,11 +40,13 @@ def new_base_canvas(config):
     return canvas
 
 
-def build_loop(window, gateway, controller, bus, config):
+def build_loop(window, gateway, controller, bus, config, own_color=None):
     """Everything drawn around `gateway`, wired into a frame loop.
 
     The bus is handed in already carrying whatever the game publishes onto it -
     an engine's own bus when playing locally, one fed from the network when not.
+    `own_color` is this player's side when networked, so the Hud can mark it; a
+    local game leaves it None and no side is tagged.
     """
     subscribe_sound(bus, AudioPlayer(), config)
     renderer = GraphicsRenderer(
@@ -57,7 +59,7 @@ def build_loop(window, gateway, controller, bus, config):
         engine=gateway,
         controller=controller,
         renderer=renderer,
-        hud=Hud(config, subscribe_banner(bus, config)),
+        hud=Hud(config, subscribe_banner(bus, config), own_color),
         translator=InputTranslator(controller),
         base=new_base_canvas(config),
     )

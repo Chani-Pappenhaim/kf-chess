@@ -10,11 +10,10 @@ tell which of the two it is drawing.
 """
 from __future__ import annotations
 
-from getpass import getpass
-
 from client.gateway import NetworkGateway
 from client.identity import Identity
 from client.inbox import Inbox
+from client.password import read_password
 from client.router import MessageRouter
 from client.socket import WebSocketClient
 from client.waiting import wait_for_state
@@ -39,9 +38,9 @@ def build_client(config=settings):
     return inbox, bus, identity, socket, gateway
 
 
-def run(config=settings, ask=input, ask_secret=getpass):  # pragma: no cover - real-time GUI loop
-    # Login is asked in the shell, not the window; the password is read without
-    # echo. A new username registers, a known one must match.
+def run(config=settings, ask=input, ask_secret=read_password):  # pragma: no cover - real-time GUI loop
+    # Login is asked in the shell, not the window; the password is echoed as
+    # asterisks. A new username registers, a known one must match.
     username = ask(config.USERNAME_PROMPT).strip() or "guest"
     password = ask_secret(config.PASSWORD_PROMPT)
     inbox, bus, identity, socket, gateway = build_client(config)
@@ -57,15 +56,22 @@ def run(config=settings, ask=input, ask_secret=getpass):  # pragma: no cover - r
                 print(identity.rejection_reason())
             return
 
+        greeting = (
+            config.ACCOUNT_CREATED_MESSAGE if identity.new_account()
+            else config.WELCOME_BACK_MESSAGE
+        )
+        print(greeting.format(name=username))
+
         # The model gives the board's extent, which is all the mapper needs; the
         # client has no board of its own. The colour gates which pieces this
-        # player may pick up.
+        # player may pick up, and marks their side in the Hud.
+        color = identity.color()
         controller = Controller(
             gateway,
             BoardMapper(model, config.CELL_SIZE, board_origin(config)),
-            own_color=identity.color(),
+            own_color=color,
         )
-        build_loop(window, gateway, controller, bus, config).run()
+        build_loop(window, gateway, controller, bus, config, own_color=color).run()
     finally:
         window.close()
 
