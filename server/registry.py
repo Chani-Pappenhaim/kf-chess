@@ -20,12 +20,19 @@ class PlayerRegistry:
         self._by_color = {}  # colour -> Account
 
     def seat(self, account):
-        """Give `account` the next free colour, or None when both are taken."""
+        """Give `account` the next free colour, or None when both are taken or
+        this player is already seated - so one person cannot hold both colours
+        and play against themselves."""
+        if self._already_seated(account.username):
+            return None
         for color in self._colors:
             if color not in self._by_color:
                 self._by_color[color] = account
                 return color
         return None
+
+    def _already_seated(self, username):
+        return any(account.username == username for account in self._by_color.values())
 
     def leave(self, color):
         """Free a colour when its player disconnects, so the seat can be retaken."""

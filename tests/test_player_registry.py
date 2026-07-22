@@ -67,3 +67,21 @@ def test_leaving_reopens_the_seat():
     registry.leave("w")
     assert registry.seat(account("chani")) == "w"
     assert registry.names() == {"b": "yossi", "w": "chani"}
+
+
+def test_one_player_cannot_take_both_colours():
+    # The same person on two connections must not play against themselves: once
+    # seated, a second seat is refused even though a colour is free.
+    registry = PlayerRegistry(COLORS)
+    assert registry.seat(account("dana")) == "w"
+    assert registry.seat(account("dana")) is None
+    assert registry.names() == {"w": "dana"}
+
+
+def test_the_freed_seat_can_be_retaken_by_the_same_name():
+    # Refusing a duplicate must not lock a name out for good: after leaving, that
+    # player can sit again (e.g. reconnecting).
+    registry = PlayerRegistry(COLORS)
+    registry.seat(account("dana"))
+    registry.leave("w")
+    assert registry.seat(account("dana")) == "w"
