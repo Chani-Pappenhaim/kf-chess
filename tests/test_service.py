@@ -145,7 +145,7 @@ def test_a_returning_user_with_the_wrong_password_is_refused():
     _engine, _outbox, game = service(store)
     session, replies = admit(game, "dana", password="wrong")
     assert session is None
-    assert replies[0] == Rejected("wrong password")
+    assert replies[0] == Rejected(settings.REJECT_WRONG_PASSWORD)
 
 
 def test_a_wrong_password_does_not_take_a_seat():

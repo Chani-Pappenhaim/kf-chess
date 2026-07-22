@@ -23,12 +23,13 @@ from server.handler import CommandHandler
 
 
 class GameService:
-    def __init__(self, engine, board_height, outbox, registry, store):
+    def __init__(self, engine, board_height, outbox, registry, store, config):
         self._engine = engine
         self._height = board_height
         self._outbox = outbox
         self._registry = registry
         self._store = store
+        self._config = config
 
     def tick(self, dt):
         """Advance the game by `dt` and queue the state that results.
@@ -51,10 +52,10 @@ class GameService:
             return None, ()
         account = self._account_for(login)
         if account is None:
-            return None, (encode(Rejected("wrong password")),)
+            return None, (encode(Rejected(self._config.REJECT_WRONG_PASSWORD)),)
         color = self._registry.seat(account)
         if color is None:
-            return None, (encode(Rejected("the game already has two players")),)
+            return None, (encode(Rejected(self._config.REJECT_GAME_FULL)),)
         session = CommandHandler(self._engine, self._height, send, color)
         return session, (encode(Welcome(color)), self._state_line())
 

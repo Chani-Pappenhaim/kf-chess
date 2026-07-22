@@ -45,7 +45,7 @@ def build_service(config=settings, store=None):
     accounts = store or SqliteAccountStore(config.ACCOUNTS_DB, config.STARTING_RATING)
     subscribe_broadcast(bus, outbox.to_all)
     subscribe_ratings(bus, players, accounts, config)
-    return engine, outbox, GameService(engine, board.height, outbox, players, accounts)
+    return engine, outbox, GameService(engine, board.height, outbox, players, accounts, config)
 
 
 def run(config=settings):  # pragma: no cover - runs until interrupted
@@ -59,7 +59,7 @@ def run(config=settings):  # pragma: no cover - runs until interrupted
         # says nothing a person can act on; the address and the reason do.
         print(f"cannot listen on {config.SERVER_URL}: {error.strerror}")
     except KeyboardInterrupt:
-        print("server stopped")
+        print(config.SERVER_STOPPED_MESSAGE)
 
 
 if __name__ == "__main__":  # pragma: no cover

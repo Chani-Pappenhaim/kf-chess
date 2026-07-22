@@ -118,6 +118,14 @@ SERVER_TICK_MS = 33
 # Shown in the client's window until the server sends the first state.
 CONNECTING_TEXT = "connecting..."
 
+# What the shell and the server say to a person. Kept here with the rest of the
+# user-facing text so wording is changed in one place, not hunted through code.
+USERNAME_PROMPT = "username: "
+PASSWORD_PROMPT = "password: "
+SERVER_STOPPED_MESSAGE = "server stopped"
+REJECT_WRONG_PASSWORD = "wrong password"
+REJECT_GAME_FULL = "the game already has two players"
+
 # Accounts, saved on the server. Every new player starts at STARTING_RATING and
 # moves by ELO after each game; ELO_K_FACTOR is how far a single result can shift
 # a rating. Only server-side account handling reads these.

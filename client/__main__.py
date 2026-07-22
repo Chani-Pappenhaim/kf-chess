@@ -42,8 +42,8 @@ def build_client(config=settings):
 def run(config=settings, ask=input, ask_secret=getpass):  # pragma: no cover - real-time GUI loop
     # Login is asked in the shell, not the window; the password is read without
     # echo. A new username registers, a known one must match.
-    username = ask("username: ").strip() or "guest"
-    password = ask_secret("password: ")
+    username = ask(config.USERNAME_PROMPT).strip() or "guest"
+    password = ask_secret(config.PASSWORD_PROMPT)
     inbox, bus, identity, socket, gateway = build_client(config)
 
     socket.start()
