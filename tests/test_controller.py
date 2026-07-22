@@ -122,6 +122,6 @@ def test_a_networked_player_cannot_pick_up_the_other_colour():
 
 
 def _recolor(controller, engine, board, color):
-    from game.board_mapper import BoardMapper
-    from game.controller import Controller
+    from interaction.board_mapper import BoardMapper
+    from interaction.controller import Controller
     return Controller(engine, BoardMapper(board, settings.CELL_SIZE), own_color=color)

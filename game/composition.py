@@ -12,8 +12,8 @@ from rules.rule_registry import build_default_registry
 from rules.rule_engine import RuleEngine
 from rules.game_conditions import KingCaptureWinCondition, LastRankPromotion
 from game.engine import GameEngine
-from game.board_mapper import BoardMapper
-from game.controller import Controller
+from interaction.board_mapper import BoardMapper
+from interaction.controller import Controller
 from game.move_log import MoveLog
 from game.scoreboard import Scoreboard
 from game.notation import CoordinateNotation

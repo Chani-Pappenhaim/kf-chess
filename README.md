@@ -19,9 +19,9 @@ realtime/  models.py              - Move / Jump in-flight motion objects
            real_time_arbiter.py   - RealTimeArbiter (clock, arrivals, interception) + ArrivalEvent
 game/      models.py              - MoveResult + Reason (engine command-boundary result)
            parser.py              - splits the command script into board/commands sections
-           board_mapper.py        - BoardMapper (pixel -> cell)
-           controller.py          - Controller (selection state + click/jump dispatch)
            engine.py              - GameEngine (application-service coordinator)
+interaction/ controller.py        - Controller (selection state + click/jump dispatch)
+           board_mapper.py        - BoardMapper (pixel -> cell); the client-side app layer
 view/      snapshot.py            - GameSnapshot (read-only text view model)
            render_model.py        - RenderModel (rich read model for the graphical UI)
            renderer.py            - snapshot -> text rendering
@@ -69,8 +69,8 @@ layer without touching the others:
   moves/jumps, arrival timing, capture and interception; reports `ArrivalEvent`s.
 - **GameEngine** (`game/engine.py`) - application-service coordinator and public
   command boundary; owns the game-over guard and one-motion-at-a-time policy.
-- **Controller / BoardMapper** (`game/controller.py`, `game/board_mapper.py`) -
-  translate pixels to cells and own selection state.
+- **Controller / BoardMapper** (`interaction/`) - the client-side app layer:
+  translate pixels to cells, own selection state, talk only to the gateway.
 - **View** (`view/`) - renders a read-only `GameSnapshot`, never the live board.
 
 ## How the 4 requirements are addressed

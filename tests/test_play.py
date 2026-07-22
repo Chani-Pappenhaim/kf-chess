@@ -1,6 +1,6 @@
 import play
 from config import settings
-from game.controller import Controller
+from interaction.controller import Controller
 from game.engine import GameEngine
 from ui.composition import load_board_background, new_base_canvas
 

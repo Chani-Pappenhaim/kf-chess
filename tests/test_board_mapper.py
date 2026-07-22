@@ -1,5 +1,5 @@
 from board.board import Board
-from game.board_mapper import BoardMapper
+from interaction.board_mapper import BoardMapper
 
 
 def _mapper(origin=(0, 0)):

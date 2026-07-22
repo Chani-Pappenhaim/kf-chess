@@ -18,8 +18,8 @@ from client.socket import WebSocketClient
 from client.waiting import wait_for_state
 from config import settings
 from events.bus import EventBus
-from game.board_mapper import BoardMapper
-from game.controller import Controller
+from interaction.board_mapper import BoardMapper
+from interaction.controller import Controller
 from graphics.window import Window
 from protocol.messages import Login, encode
 from ui.composition import board_origin, build_loop

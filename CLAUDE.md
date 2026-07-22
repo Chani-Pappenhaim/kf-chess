@@ -64,14 +64,18 @@ it sequences.
   `ALLOW_CONCURRENT_MOVES` policy), delegates validation to `RuleEngine`, starts
   validated motions on the arbiter, advances time, and **publishes** what
   happened on the `EventBus` (see `events/`), never calling its consumers by
-  name. `controller.py` owns selection state and turns pixel clicks into gateway
-  commands (via `board_mapper.py`), deciding what a click does from the render
-  model rather than a command's reply, so it drives a remote game unchanged;
-  `subscribers.py` (`MoveRecorder`, `CaptureScorer`) writes the move log and
+  name. `subscribers.py` (`MoveRecorder`, `CaptureScorer`) writes the move log and
   score off the bus; `squares.py` is the one place a file/rank square (`e2`) is
   written and read; `parser.py` splits a script into board/commands sections.
   `composition.py` is the **single composition root** — the one place the whole
   dependency graph is wired.
+- `interaction/` — the client-side application layer, the same for a local or a
+  networked game: `controller.py` owns selection state and turns pixel clicks
+  into gateway commands (via `board_mapper.py`), deciding what a click does from
+  the render model rather than a command's reply — so it drives a remote game
+  unchanged — and gates selection by `own_color` when networked. It talks only
+  to the `GameGateway`, never the concrete engine, and knows nothing of rooms,
+  sockets, or which colour the *server* thinks you are.
 - `events/` — `EventBus`: a domain-agnostic publish/subscribe mechanism that
   routes each event to the subscribers of its exact type. `game/events.py` holds
   the vocabulary (`GameStarted`, `MoveCompleted`, `PieceCaptured`, `JumpStarted`,
