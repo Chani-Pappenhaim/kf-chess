@@ -9,7 +9,12 @@ from __future__ import annotations
 
 
 def token_to_code(token):
-    """Internal token -> asset folder code ("wP" -> "PW")."""
+    """Internal token -> asset folder code ("wP" -> "PW").
+
+    The inverse of board.loaders.csv_to_token: the CSV board and the sprite
+    folders share the KIND+COLOUR naming, so change one and check the other.
+    Kept separate on purpose - graphics may not be a dependency of board.
+    """
     color, kind = token[0], token[1]
     return kind + color.upper()
 

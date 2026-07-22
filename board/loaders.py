@@ -43,7 +43,11 @@ def _build_board(rows, parse_line, valid_tokens, empty_token):
 
 
 def csv_to_token(code):
-
+    # The external asset form is KIND+COLOUR ("QW"); the internal token is
+    # colour+kind ("wQ"). graphics.sprite_library.token_to_code is the inverse of
+    # this, for the sprite folders, which share the same naming - change one and
+    # check the other. They are not unified: board must not depend on graphics,
+    # and it is two lines either way.
     if len(code) != 2:
         raise BoardParseError("UNKNOWN_TOKEN")
     kind, color = code[0], code[1].lower()
