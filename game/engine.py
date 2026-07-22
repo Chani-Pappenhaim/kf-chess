@@ -78,7 +78,6 @@ class GameEngine:
         return self._rule_engine.legal_targets(self._board, cell)
 
     def request_move(self, start, end):
-        self._apply_events(self._arbiter.resolve())
         if self._game_over:
             return MoveResult(False, Reason.GAME_OVER)
         if self.is_busy(start):
@@ -110,7 +109,6 @@ class GameEngine:
         return MoveResult(True, Reason.OK)
 
     def request_jump(self, cell):
-        self._apply_events(self._arbiter.resolve())
         if self._game_over:
             return MoveResult(False, Reason.GAME_OVER)
         if self.is_busy(cell):
@@ -183,7 +181,8 @@ class GameEngine:
         return RenderPiece(token=token, cell=cell)
 
     def render(self, renderer):
-        self._apply_events(self._arbiter.resolve())
+        # A pure query: time - and so arrivals - only move in wait(), which has
+        # already published them, so there is nothing to settle here.
         return renderer.render(self.snapshot())
 
     # -- internal helpers -------------------------------------------------

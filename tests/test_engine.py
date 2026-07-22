@@ -92,6 +92,18 @@ def test_request_move_starts_a_legal_move():
     assert board.get(0, 0) == "wR"  # piece stays at the source until it arrives
 
 
+def test_a_command_does_not_advance_time_of_its_own():
+    # Only wait() moves the clock, so a second command issued without a wait
+    # cannot make the first move arrive early: the rook is still on its source
+    # and a query mid-command settles nothing.
+    engine, board = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
+    engine.request_move((0, 0), (0, 2))
+    engine.request_jump((2, 2))  # a second command, no wait between
+
+    assert engine.clock == 0
+    assert board.get(0, 0) == "wR"  # never arrived, because no time passed
+
+
 def test_move_lands_after_move_duration_elapses():
     engine, board = make_engine([["wR", ".", "."], [".", ".", "."], [".", ".", "."]])
     engine.request_move((0, 0), (0, 2))
