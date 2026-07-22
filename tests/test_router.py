@@ -1,6 +1,7 @@
 import pytest
 
 import play
+from client.identity import Identity
 from client.inbox import Inbox
 from client.router import MessageRouter
 from config import settings
@@ -12,19 +13,21 @@ from protocol.messages import (
     EventNotice,
     HintsReply,
     MoveRequest,
+    Rejected,
     StateUpdate,
+    Welcome,
     encode,
 )
 from protocol.state import encode_model
 
 
 def routed():
-    inbox, bus = Inbox(), EventBus()
-    return inbox, bus, MessageRouter(inbox, bus)
+    inbox, bus, identity = Inbox(), EventBus(), Identity()
+    return inbox, bus, identity, MessageRouter(inbox, bus, identity)
 
 
 def test_a_state_message_becomes_the_model_to_draw():
-    inbox, _bus, router = routed()
+    inbox, _bus, _id, router = routed()
     model = play.build_engine(settings).render_model()
 
     router.route(encode(StateUpdate(encode_model(model))))
@@ -35,7 +38,7 @@ def test_a_state_message_becomes_the_model_to_draw():
 def test_an_event_message_is_republished_on_the_client_bus():
     # The whole point: the same event object the server's engine announced now
     # exists on this client's bus, so the same subscribers react to it.
-    inbox, bus, router = routed()
+    inbox, bus, _id, router = routed()
     seen = []
     bus.subscribe(PieceCaptured, seen.append)
     event = PieceCaptured("wR", "bP", (5, 2), 1000)
@@ -46,7 +49,7 @@ def test_an_event_message_is_republished_on_the_client_bus():
 
 
 def test_each_event_reaches_only_its_own_subscribers():
-    _inbox, bus, router = routed()
+    _inbox, bus, _id, router = routed()
     captures, moves = [], []
     bus.subscribe(PieceCaptured, captures.append)
     bus.subscribe(MoveCompleted, moves.append)
@@ -59,18 +62,30 @@ def test_each_event_reaches_only_its_own_subscribers():
 
 
 def test_a_hints_message_becomes_an_answer_about_that_square():
-    inbox, _bus, router = routed()
+    inbox, _bus, _id, router = routed()
     router.route(encode(HintsReply("e2", ("e3", "e4"))))
     assert inbox.hints("e2") == ("e3", "e4")
 
 
 def test_a_message_only_a_client_sends_is_refused():
-    _inbox, _bus, router = routed()
+    _inbox, _bus, _id, router = routed()
     with pytest.raises(ProtocolError):
         router.route(encode(MoveRequest("WQe2e5")))
 
 
 def test_text_that_is_not_a_message_is_refused():
-    _inbox, _bus, router = routed()
+    _inbox, _bus, _id, router = routed()
     with pytest.raises(ProtocolError):
         router.route("nonsense")
+
+
+def test_a_welcome_tells_this_client_its_colour():
+    _inbox, _bus, identity, router = routed()
+    router.route(encode(Welcome("b")))
+    assert identity.color() == "b"
+
+
+def test_a_rejection_is_recorded_so_the_client_can_give_up():
+    _inbox, _bus, identity, router = routed()
+    router.route(encode(Rejected("full")))
+    assert identity.rejected() is True

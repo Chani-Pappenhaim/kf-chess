@@ -1,3 +1,4 @@
+from client.identity import Identity
 from client.inbox import Inbox
 from config import settings
 from client.waiting import wait_for_state, waiting_canvas
@@ -30,7 +31,7 @@ def test_a_state_already_in_hand_is_returned_without_drawing():
     inbox.receive_state(model)
     window = _FakeWindow()
 
-    assert wait_for_state(window, inbox, settings) is model
+    assert wait_for_state(window, inbox, Identity(), settings) is model
     assert window.shown == 0
 
 
@@ -49,11 +50,18 @@ def test_the_screen_is_held_until_a_state_arrives():
             return super().model()
 
     inbox, window = _ArrivingInbox(), _FakeWindow()
-    assert wait_for_state(window, inbox, settings) is not None
+    assert wait_for_state(window, inbox, Identity(), settings) is not None
     assert window.shown == 2  # drawn on each of the two empty looks
 
 
 def test_closing_the_window_while_waiting_gives_up():
-    # The one thing that can happen on this screen and has to be answered for.
     window = _FakeWindow(events=[("quit",)])
-    assert wait_for_state(window, Inbox(), settings) is None
+    assert wait_for_state(window, Inbox(), Identity(), settings) is None
+
+
+def test_a_rejected_client_stops_waiting():
+    # Turned away by a full server: the wait ends, and the caller learns why
+    # from the same identity.
+    identity = Identity()
+    identity.reject()
+    assert wait_for_state(_FakeWindow(), Inbox(), identity, settings) is None

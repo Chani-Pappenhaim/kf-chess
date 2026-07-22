@@ -30,7 +30,7 @@ class Hud:
         self._cell = config.CELL_SIZE
         self._board_px = config.BOARD_PX
         self._gutter = config.COORD_GUTTER
-        self._name = config.PLAYER_NAME
+        self._title = config.WINDOW_TITLE
         self._title_baseline = config.TITLE_HEIGHT - 16
         self._top_score_baseline = config.TITLE_HEIGHT + config.SCORE_HEIGHT - 12
         self._bottom_score_baseline = (
@@ -56,16 +56,23 @@ class Hud:
         self._draw_banner(canvas, model.clock)
 
     def _draw_title(self, canvas):
-        text = f"Name: {self._name}"
-        canvas.put_text(text, self._centered(text), self._title_baseline, 0.8, _TEXT, 2)
+        canvas.put_text(
+            self._title, self._centered(self._title), self._title_baseline, 0.8, _TEXT, 2
+        )
 
     def _draw_scores(self, canvas, model):
-        # Each player's score sits on their side of the board: Black above, White
-        # below. as_dict on a fresh scoreboard is {'w': 0, 'b': 0}.
-        black = f"Score: {model.scores.get('b', 0)}"
-        white = f"Score: {model.scores.get('w', 0)}"
+        # Each player's name and score sit on their side of the board: Black
+        # above, White below. The name is blank until a player has that colour
+        # (empty in local play, and for a colour nobody has joined as yet).
+        black = self._name_and_score("b", model)
+        white = self._name_and_score("w", model)
         canvas.put_text(black, self._centered(black), self._top_score_baseline, 0.9, _TEXT, 2)
         canvas.put_text(white, self._centered(white), self._bottom_score_baseline, 0.9, _TEXT, 2)
+
+    def _name_and_score(self, color, model):
+        name = model.players.get(color, "")
+        prefix = f"{name}  " if name else ""
+        return f"{prefix}Score: {model.scores.get(color, 0)}"
 
     def _draw_coordinates(self, canvas, model):
         """The a-h files above and below the board, and the ranks down each side

@@ -41,9 +41,23 @@ def _model(**overrides):
 def test_hud_shows_the_title_and_both_scores():
     canvas = _canvas()
     _hud().draw(canvas, _model(scores={"w": 5, "b": 3}))
-    assert f"Name: {settings.PLAYER_NAME}" in canvas.texts
+    assert settings.WINDOW_TITLE in canvas.texts
     assert "Score: 5" in canvas.texts  # white, below the board
     assert "Score: 3" in canvas.texts  # black, above the board
+
+
+def test_hud_shows_each_players_name_with_their_score():
+    canvas = _canvas()
+    _hud().draw(canvas, _model(scores={"w": 5, "b": 3}, players={"w": "dana", "b": "yossi"}))
+    assert "dana  Score: 5" in canvas.texts    # white, below
+    assert "yossi  Score: 3" in canvas.texts   # black, above
+
+
+def test_hud_shows_a_bare_score_when_no_one_has_that_colour():
+    # Local play, and any colour nobody has joined as yet: no name, just a score.
+    canvas = _canvas()
+    _hud().draw(canvas, _model(scores={"w": 0, "b": 0}))
+    assert "Score: 0" in canvas.texts
 
 
 def test_hud_draws_coordinate_labels():

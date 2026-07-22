@@ -9,6 +9,8 @@ so nothing in this module knows what a socket is.
 """
 from __future__ import annotations
 
+from dataclasses import replace
+
 from protocol.events import EVENT_TYPES, encode_event
 from protocol.messages import EventNotice, StateUpdate, encode
 from protocol.state import encode_model
@@ -27,11 +29,14 @@ def subscribe_broadcast(bus, send):
         bus.subscribe(event_type, relay)
 
 
-def broadcast_state(engine, send):
+def broadcast_state(engine, players, send):
     """Send the whole state as it stands right now.
 
-    Whole, not the difference from last time: a client that misses one of these
-    is corrected by the next, and one that has just connected needs no catching
+    The player names are the server's, not the engine's, so they are folded into
+    the model here at the boundary rather than inside a game that has no notion
+    of players. Whole state, not the difference from last time: a client that
+    misses one is corrected by the next, and one just connected needs no catching
     up beyond a single line.
     """
-    send(encode(StateUpdate(encode_model(engine.render_model()))))
+    model = replace(engine.render_model(), players=players)
+    send(encode(StateUpdate(encode_model(model))))

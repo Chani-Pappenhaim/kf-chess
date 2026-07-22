@@ -15,6 +15,7 @@ from events.bus import EventBus
 from game.composition import build_engine, build_registry
 from server.broadcast import subscribe_broadcast
 from server.outbox import Outbox
+from server.registry import PlayerRegistry
 from server.service import GameService
 from server.socket import WebSocketServer
 
@@ -30,12 +31,13 @@ def load_board(config):
 def build_service(config=settings):
     """The game, wired to announce itself. Returns the engine (to start), the
     outbox (to drain), and the service the socket drives."""
-    board, registry = load_board(config)
+    board, rule_registry = load_board(config)
     bus = EventBus()
-    engine = build_engine(board, registry, config, bus)
+    engine = build_engine(board, rule_registry, config, bus)
     outbox = Outbox()
     subscribe_broadcast(bus, outbox.to_all)
-    return engine, outbox, GameService(engine, board.height, outbox)
+    players = PlayerRegistry(config.COLORS)
+    return engine, outbox, GameService(engine, board.height, outbox, players)
 
 
 def run(config=settings):  # pragma: no cover - runs until interrupted

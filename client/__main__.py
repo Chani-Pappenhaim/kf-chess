@@ -3,12 +3,15 @@
 The fourth entry point, and the only one with no game inside it: no board, no
 rules, no clock. It sends what the player does and draws what it is told.
 
-Everything above the gateway is the same code play.py runs. That is the whole
-point of the seam: the window cannot tell which of the two it is drawing.
+Login is asked in the shell, not the window, as the slide asks: a username is
+read, sent as the first line, and the server answers with a colour or a refusal.
+Everything above the gateway is the same code play.py runs - the window cannot
+tell which of the two it is drawing.
 """
 from __future__ import annotations
 
 from client.gateway import NetworkGateway
+from client.identity import Identity
 from client.inbox import Inbox
 from client.router import MessageRouter
 from client.socket import WebSocketClient
@@ -18,6 +21,7 @@ from events.bus import EventBus
 from game.board_mapper import BoardMapper
 from game.controller import Controller
 from graphics.window import Window
+from protocol.messages import Login, encode
 from ui.composition import board_origin, build_loop
 
 
@@ -27,26 +31,34 @@ def build_client(config=settings):
     The bus is the client's own. Events arriving from the server are published
     onto it, so sound and banners subscribe exactly as they do locally.
     """
-    inbox, bus = Inbox(), EventBus()
-    socket = WebSocketClient(config, MessageRouter(inbox, bus))
+    inbox, bus, identity = Inbox(), EventBus(), Identity()
+    socket = WebSocketClient(config, MessageRouter(inbox, bus, identity))
     gateway = NetworkGateway(inbox, socket.send)
-    return inbox, bus, socket, gateway
+    return inbox, bus, identity, socket, gateway
 
 
-def run(config=settings):  # pragma: no cover - real-time GUI loop
-    inbox, bus, socket, gateway = build_client(config)
+def run(config=settings, prompt=input):  # pragma: no cover - real-time GUI loop
+    username = prompt("username: ").strip() or "guest"
+    inbox, bus, identity, socket, gateway = build_client(config)
+
     socket.start()
+    socket.send(encode(Login(username)))  # the opening line the server expects
 
     window = Window(config.WINDOW_TITLE)
     try:
-        model = wait_for_state(window, inbox, config)
+        model = wait_for_state(window, inbox, identity, config)
         if model is None:
-            return  # closed before the game ever arrived
+            if identity.rejected():
+                print("the game already has two players")
+            return
 
-        # The model is what the mapper measures clicks against: the client has
-        # no board of its own, and needs none - only the board's extent.
+        # The model gives the board's extent, which is all the mapper needs; the
+        # client has no board of its own. The colour gates which pieces this
+        # player may pick up.
         controller = Controller(
-            gateway, BoardMapper(model, config.CELL_SIZE, board_origin(config))
+            gateway,
+            BoardMapper(model, config.CELL_SIZE, board_origin(config)),
+            own_color=identity.color(),
         )
         build_loop(window, gateway, controller, bus, config).run()
     finally:

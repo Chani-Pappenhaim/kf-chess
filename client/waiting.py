@@ -21,13 +21,16 @@ def waiting_canvas(config, message):
     return canvas
 
 
-def wait_for_state(window, inbox, config):
+def wait_for_state(window, inbox, identity, config):
     """Hold the window on the waiting screen until a state arrives.
 
-    Returns the state, or None if the player closed the window first - which is
-    the one thing that can happen here and has to be answered for.
+    Returns the state, or None if the player closed the window first or the
+    server turned them away - the two things that can end the wait without a
+    game. The caller tells them apart by asking `identity`.
     """
     while True:
+        if identity.rejected():
+            return None
         model = inbox.model()
         if model is not None:
             return model

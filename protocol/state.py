@@ -23,6 +23,7 @@ def encode_model(model):
         "clock": model.clock,
         "moves": [_encode_move(record) for record in model.moves],
         "scores": dict(model.scores),
+        "players": dict(model.players),
     }
 
 
@@ -36,6 +37,7 @@ def decode_model(data):
         clock=data["clock"],
         moves=tuple(_decode_move(record) for record in data["moves"]),
         scores=dict(data["scores"]),
+        players=dict(data["players"]),
     )
 
 

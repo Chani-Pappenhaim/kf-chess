@@ -20,6 +20,14 @@ from protocol.records import by_name, decode_record, encode_record
 # -- client to server ------------------------------------------------------
 
 @dataclass(frozen=True)
+class Login:
+    """The first thing a client says: who is joining. Sent before any command,
+    so the server can hand out a colour before it takes orders."""
+
+    username: str
+
+
+@dataclass(frozen=True)
 class MoveRequest:
     """Move a piece. `command` is the wire form built by protocol.commands."""
 
@@ -44,6 +52,23 @@ class HintsRequest:
 # -- server to client ------------------------------------------------------
 
 @dataclass(frozen=True)
+class Welcome:
+    """The answer to a Login: the colour this client was given. It is the one
+    thing a client cannot read off the state, since the state names players but
+    not which of them is you."""
+
+    color: str
+
+
+@dataclass(frozen=True)
+class Rejected:
+    """The other answer to a Login: no seat was free. The game already has its
+    two players."""
+
+    reason: str
+
+
+@dataclass(frozen=True)
 class StateUpdate:
     """The whole game state to draw, from protocol.state.encode_model."""
 
@@ -66,9 +91,12 @@ class HintsReply:
 
 
 MESSAGE_TYPES = (
+    Login,
     MoveRequest,
     JumpRequest,
     HintsRequest,
+    Welcome,
+    Rejected,
     StateUpdate,
     EventNotice,
     HintsReply,

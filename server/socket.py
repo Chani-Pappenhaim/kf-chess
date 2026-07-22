@@ -39,9 +39,17 @@ class WebSocketServer:  # pragma: no cover - socket shell, exercised by running 
         def send(line):
             self._outbox.to(connection, line)
 
-        self._service.greet(send)
-        session = self._service.session_for(send)
+        session = None
         try:
+            # The opening line must be a Login. Its replies (a welcome and the
+            # first state, or a rejection) are awaited straight onto the wire,
+            # so a refused client still hears why before the connection closes.
+            opening = await connection.recv()
+            session, replies = self._service.admit(opening, send)
+            for line in replies:
+                await connection.send(line)
+            if session is None:
+                return
             async for text in connection:
                 try:
                     session.handle(text)
@@ -52,6 +60,8 @@ class WebSocketServer:  # pragma: no cover - socket shell, exercised by running 
         except ConnectionClosed:
             pass
         finally:
+            if session is not None:
+                self._service.depart(session)
             self._clients.discard(connection)
 
     async def _pump(self):

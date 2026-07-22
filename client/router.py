@@ -11,15 +11,25 @@ from __future__ import annotations
 
 from protocol.errors import ProtocolError
 from protocol.events import decode_event
-from protocol.messages import EventNotice, HintsReply, StateUpdate, decode
+from protocol.messages import (
+    EventNotice,
+    HintsReply,
+    Rejected,
+    StateUpdate,
+    Welcome,
+    decode,
+)
 from protocol.state import decode_model
 
 
 class MessageRouter:
-    def __init__(self, inbox, bus):
+    def __init__(self, inbox, bus, identity):
         self._inbox = inbox
         self._bus = bus
+        self._identity = identity
         self._actions = {
+            Welcome: self._welcome,
+            Rejected: self._rejected,
             StateUpdate: self._state,
             EventNotice: self._event,
             HintsReply: self._hints,
@@ -37,6 +47,12 @@ class MessageRouter:
         if action is None:
             raise ProtocolError(type(message).__name__)
         action(message)
+
+    def _welcome(self, message):
+        self._identity.welcome(message.color)
+
+    def _rejected(self, message):
+        self._identity.reject()
 
     def _state(self, message):
         self._inbox.receive_state(decode_model(message.state))

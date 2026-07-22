@@ -10,18 +10,24 @@ from protocol.messages import (
     HintsReply,
     HintsRequest,
     JumpRequest,
+    Login,
     MESSAGE_TYPES,
     MoveRequest,
+    Rejected,
     StateUpdate,
+    Welcome,
     decode,
     encode,
 )
 from protocol.state import decode_model, encode_model
 
 SAMPLES = (
+    Login("dana"),
     MoveRequest("WQe2e5"),
     JumpRequest("e4"),
     HintsRequest("e2"),
+    Welcome("w"),
+    Rejected("full"),
     StateUpdate({"pieces": []}),
     EventNotice({"name": "GameStarted", "fields": {"at_ms": 0}}),
     HintsReply("e2", ("e3", "e4")),

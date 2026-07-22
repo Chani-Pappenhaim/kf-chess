@@ -109,3 +109,19 @@ def test_second_click_clears_a_selection_whose_piece_has_left():
 
     controller.click(*cell_to_pixel(2, 2))
     assert controller.selected is None
+
+
+def test_a_networked_player_cannot_pick_up_the_other_colour():
+    # own_color gates selection: white may lift white, black may not be lifted.
+    controller, engine, board = make_controller([["wK", "bK"], [".", "."]])
+    controller = _recolor(controller, engine, board, "w")
+    controller.click(*cell_to_pixel(0, 1))   # a black king
+    assert controller.selected is None
+    controller.click(*cell_to_pixel(0, 0))   # white's own king
+    assert controller.selected == (0, 0)
+
+
+def _recolor(controller, engine, board, color):
+    from game.board_mapper import BoardMapper
+    from game.controller import Controller
+    return Controller(engine, BoardMapper(board, settings.CELL_SIZE), own_color=color)

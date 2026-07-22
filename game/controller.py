@@ -10,11 +10,17 @@ class Controller:
 
     Both collaborators are injected. Selection is deliberately kept here (not on
     the engine) so the engine stays a pure application service.
+
+    `own_color` is the colour this player may pick up, or None for a local game
+    where one person moves both. It only gates selection - a UI courtesy so you
+    cannot lift the opponent's piece; the server, not this, is what actually
+    refuses an out-of-turn move.
     """
 
-    def __init__(self, engine, board_mapper):
+    def __init__(self, engine, board_mapper, own_color=None):
         self._engine = engine
         self._mapper = board_mapper
+        self._own_color = own_color
         self._selected = None
 
     @property
@@ -40,13 +46,15 @@ class Controller:
         model = self._engine.render_model()
         if self._selected is None:
             # First click selects a piece if that cell can be a move source.
-            if model.selectable(cell):
+            if self._can_select(model, cell):
                 self._selected = cell
             return
 
         # Second click: send the move, then re-select or clear. Clicking another
         # of your own free pieces picks that one up instead; every other second
         # click clears the selection, whether the move was accepted or refused.
+        # The selected piece is already this player's, so "same colour as the
+        # selection" is also the ownership check - no need to repeat own_color.
         self._engine.request_move(self._selected, cell)
         own_free_piece = self._same_color_as_selection(model, cell) and model.selectable(cell)
         self._selected = cell if own_free_piece else None
@@ -58,6 +66,16 @@ class Controller:
         if cell is None:
             return
         self._engine.request_jump(cell)
+
+    def _can_select(self, model, cell):
+        """Whether `cell` may be picked up: a free piece there, and - in a
+        networked game - one of this player's own colour."""
+        if not model.selectable(cell):
+            return False
+        if self._own_color is None:
+            return True
+        piece = model.piece_at(cell)
+        return piece is not None and piece.token[0] == self._own_color
 
     def _same_color_as_selection(self, model, cell):
         """Whether `cell` holds a piece of the selected piece's own color. The
