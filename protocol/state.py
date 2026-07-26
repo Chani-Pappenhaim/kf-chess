@@ -25,6 +25,8 @@ def encode_model(model):
         "scores": dict(model.scores),
         "players": dict(model.players),
         "ratings": dict(model.ratings),
+        "viewers": list(model.viewers),
+        "countdown": model.countdown,
     }
 
 
@@ -40,6 +42,8 @@ def decode_model(data):
         scores=dict(data["scores"]),
         players=dict(data["players"]),
         ratings=dict(data["ratings"]),
+        viewers=tuple(data["viewers"]),
+        countdown=data["countdown"],
     )
 
 

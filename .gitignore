@@ -42,3 +42,6 @@ remove_background.py
 
 # Local SQLite accounts database
 accounts.db
+
+# Runtime activity logs (server/client)
+*.log

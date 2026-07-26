@@ -60,7 +60,13 @@ class JumpStarted:
 
 @dataclass(frozen=True)
 class GameEnded:
-    """The win condition was met."""
+    """The win condition was met.
+
+    `reason` says how the game ended: the default (None) is a win on the board -
+    a king taken; a win without a capture (a player who left mid-game) carries a
+    reason, so a subscriber can tell the two apart. Either way the winner is real.
+    """
 
     winner: str    # the colour that won, 'w' or 'b'
     at_ms: int
+    reason: str = None

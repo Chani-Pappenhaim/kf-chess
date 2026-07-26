@@ -121,6 +121,17 @@ def test_a_networked_player_cannot_pick_up_the_other_colour():
     assert controller.selected == (0, 0)
 
 
+def test_a_spectator_cannot_pick_up_any_piece():
+    # A viewer of a networked game is locked out of every piece - unlike a local
+    # game (own_color=None), where any piece may be lifted.
+    from interaction.board_mapper import BoardMapper
+    from interaction.controller import Controller
+    _controller, engine, board = make_controller([["wK", "bK"], [".", "."]])
+    viewer = Controller(engine, BoardMapper(board, settings.CELL_SIZE), spectator=True)
+    viewer.click(*cell_to_pixel(0, 0))
+    assert viewer.selected is None
+
+
 def _recolor(controller, engine, board, color):
     from interaction.board_mapper import BoardMapper
     from interaction.controller import Controller

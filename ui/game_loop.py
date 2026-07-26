@@ -18,7 +18,8 @@ import time
 
 
 class GameLoop:
-    def __init__(self, window, engine, controller, renderer, hud, translator, base):
+    def __init__(self, window, engine, controller, renderer, hud, translator, base,
+                 alive=None):
         self._window = window
         self._engine = engine
         self._controller = controller
@@ -26,11 +27,15 @@ class GameLoop:
         self._hud = hud
         self._translator = translator
         self._base = base
+        # A predicate the loop checks each frame: False stops it. A networked
+        # client passes "is the connection still up"; local play leaves it None
+        # and the loop runs until a quit event.
+        self._alive = alive or (lambda: True)
 
     def tick(self, dt):
         """Run one frame: advance the game by `dt` ms, render + present it, and
-        route input. Returns False when a quit event was seen (the loop should
-        stop), True otherwise."""
+        route input. Returns False when a quit event was seen or the loop's
+        `alive` predicate failed (it should stop), True otherwise."""
         self._engine.wait(dt)
         model = self._engine.render_model()
         canvas = self._renderer.render(
@@ -39,7 +44,7 @@ class GameLoop:
         )
         self._hud.draw(canvas, model)
         self._window.show(canvas)
-        running = True
+        running = self._alive()
         for event in self._window.poll_events():
             if event[0] == "quit":
                 running = False

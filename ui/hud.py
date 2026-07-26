@@ -24,7 +24,8 @@ _BANNER_CHAR_PX = 46               # the same, at the banner's larger text scale
 
 
 class Hud:
-    def __init__(self, config, banner, own_color=None):
+    def __init__(self, config, banner, own_color=None, room_id=None):
+        self._config = config
         self._bx = config.BOARD_ORIGIN_X
         self._by = config.BOARD_ORIGIN_Y
         self._cell = config.CELL_SIZE
@@ -32,6 +33,7 @@ class Hud:
         self._gutter = config.COORD_GUTTER
         self._title = config.WINDOW_TITLE
         self._own_color = own_color  # which side is this player's; None in local play
+        self._room_id = room_id      # shown on top; None in local play
         self._rating_label = config.RATING_LABEL
         self._you_marker = config.YOU_MARKER
         self._title_baseline = config.TITLE_HEIGHT - 16
@@ -52,11 +54,37 @@ class Hud:
 
     def draw(self, canvas, model):
         self._draw_title(canvas)
+        self._draw_room_id(canvas)
         self._draw_scores(canvas, model)
         self._draw_coordinates(canvas, model)
+        self._draw_viewers(canvas, model)
         self._black_panel.draw(canvas, model)
         self._white_panel.draw(canvas, model)
+        self._draw_countdown(canvas, model)
         self._draw_banner(canvas, model.clock)
+
+    def _draw_room_id(self, canvas):
+        # The room id, written on top of the screen, so players know which room
+        # to tell each other to join. Absent in local play.
+        if self._room_id is None:
+            return
+        text = self._config.ROOM_ID_LABEL.format(room_id=self._room_id)
+        canvas.put_text(text, 12, self._title_baseline, 0.7, _TEXT, 2)
+
+    def _draw_countdown(self, canvas, model):
+        # While a disconnected player's grace runs down, the one who stayed sees
+        # the seconds left before the game resigns in the other's name.
+        if model.countdown is None:
+            return
+        text = self._config.DISCONNECT_NOTICE.format(seconds=model.countdown)
+        canvas.put_text(text, self._centered(text, 14), self._by + 40, 0.9, _BANNER_TEXT, 2)
+
+    def _draw_viewers(self, canvas, model):
+        # Who is watching this room, listed under the board.
+        if not model.viewers:
+            return
+        text = self._config.VIEWERS_LABEL.format(names=", ".join(model.viewers))
+        canvas.put_text(text, 12, self._by + self._board_px + 40, 0.6, _TEXT, 1)
 
     def _draw_title(self, canvas):
         canvas.put_text(

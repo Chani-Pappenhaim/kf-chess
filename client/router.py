@@ -2,10 +2,10 @@
 
 The mirror of the server's CommandHandler: which message does what is a lookup,
 not a chain of tests, so a new message is an entry here and a method beside it.
-
-An event is republished on the client's own bus rather than handled here, which
-is what lets sound and animation react to a remote game with no idea that it is
-one - they are the same subscribers, on the same kind of bus.
+Login answers and room placement update the identity; a state or a hint goes to
+the inbox; an event is republished on the client's own bus, which is what lets
+sound and animation react to a remote game with no idea that it is one - they are
+the same subscribers, on the same kind of bus.
 """
 from __future__ import annotations
 
@@ -14,7 +14,9 @@ from protocol.events import decode_event
 from protocol.messages import (
     EventNotice,
     HintsReply,
+    NoOpponent,
     Rejected,
+    RoomEntered,
     StateUpdate,
     Welcome,
     decode,
@@ -30,6 +32,8 @@ class MessageRouter:
         self._actions = {
             Welcome: self._welcome,
             Rejected: self._rejected,
+            RoomEntered: self._entered,
+            NoOpponent: self._no_opponent,
             StateUpdate: self._state,
             EventNotice: self._event,
             HintsReply: self._hints,
@@ -49,10 +53,16 @@ class MessageRouter:
         action(message)
 
     def _welcome(self, message):
-        self._identity.welcome(message.color, message.new_account)
+        self._identity.welcome(message.new_account)
 
     def _rejected(self, message):
         self._identity.reject(message.reason)
+
+    def _entered(self, message):
+        self._identity.entered(message.color, message.room_id, message.spectator)
+
+    def _no_opponent(self, _message):
+        self._identity.search_failed()
 
     def _state(self, message):
         self._inbox.receive_state(decode_model(message.state))

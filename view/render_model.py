@@ -42,6 +42,8 @@ class RenderModel:
     scores: dict = field(default_factory=dict)  # {color: accumulated points}
     players: dict = field(default_factory=dict)  # {color: username}, empty locally
     ratings: dict = field(default_factory=dict)  # {color: ELO rating}, networked only
+    viewers: tuple = ()  # usernames watching this room, networked only
+    countdown: int = None  # seconds left before a disconnected player resigns
 
     def in_bounds(self, row, col):
         """Whether `(row, col)` is a square of this board at all - the question

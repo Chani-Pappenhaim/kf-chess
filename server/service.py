@@ -1,52 +1,43 @@
-"""The game as the socket sees it.
+"""The whole server as the socket sees it.
 
-What a socket needs from a game and nothing else: advance it, admit a client
-that has just connected, and let one depart. Keeping these here rather than
-inside the socket means the whole of what the server does is testable without
-opening a port.
+What a socket needs and nothing else: advance every game by a tick, admit a
+client that has just connected, and let one depart. Keeping these here rather
+than inside the socket means the whole of what the server does is testable
+without opening a port.
 
-Admission is where a connection becomes a player. It reads the opening Login,
-authenticates against the account store (registering a new username, or checking
-an existing one's password), then takes a colour from the registry - or turns
-the client away, with the reason, when the password is wrong or the game is full.
-The lines to send in reply travel back with it, so the socket only awaits them.
+Admission authenticates against the account store (registering a new username,
+or checking an existing one's password) and hands back a session that starts on
+the home screen. Which game it ends up in - a quick match, a room it opened, a
+room it joined - is the session's own story from there; the service only advances
+the lobby and the matchmaker on each tick.
 """
 from __future__ import annotations
 
-from dataclasses import replace
-
 from protocol.errors import ProtocolError
-from protocol.messages import Login, Rejected, StateUpdate, Welcome, decode, encode
-from protocol.state import encode_model
-from server.broadcast import broadcast_state
-from server.handler import CommandHandler
+from protocol.messages import Login, Rejected, Welcome, decode, encode
+from server.session import ClientSession
 
 
 class GameService:
-    def __init__(self, engine, board_height, outbox, registry, store, config):
-        self._engine = engine
-        self._height = board_height
-        self._outbox = outbox
-        self._registry = registry
+    def __init__(self, lobby, matchmaker, store, config):
+        self._lobby = lobby
+        self._matchmaker = matchmaker
         self._store = store
         self._config = config
 
     def tick(self, dt):
-        """Advance the game by `dt` and queue the state that results.
+        """Advance every room and age the matchmaking queue.
 
         The only place time passes: clients draw what they are sent and never
         advance anything of their own.
         """
-        self._engine.wait(dt)
-        broadcast_state(
-            self._engine, self._registry.names(), self._registry.ratings(),
-            self._outbox.to_all,
-        )
+        self._lobby.tick(dt)
+        self._matchmaker.tick(dt)
 
     def admit(self, opening, send):
-        """Seat a client from its opening Login. Returns (session, replies): the
-        session to run its commands, or None when refused, and the lines to send
-        it right now. `send` is the queue the session answers through in play."""
+        """Authenticate a client from its opening Login. Returns (session,
+        replies): a home-screen session to run, or None when refused, and the
+        lines to send it right now. `send` is the queue it answers through."""
         login = self._read_login(opening)
         if login is None:
             return None, ()
@@ -54,19 +45,15 @@ class GameService:
         account = self._account_for(login, new_account)
         if account is None:
             return None, (encode(Rejected(self._config.REJECT_WRONG_PASSWORD)),)
-        color = self._registry.seat(account)
-        if color is None:
-            return None, (encode(Rejected(self._config.REJECT_GAME_FULL)),)
-        session = CommandHandler(self._engine, self._height, send, color)
-        return session, (encode(Welcome(color, new_account)), self._state_line())
+        session = ClientSession(account, self._lobby, self._matchmaker, send, self._config)
+        return session, (encode(Welcome(new_account)),)
 
     def depart(self, session):
-        """Free a player's colour when they disconnect, so the seat reopens."""
-        self._registry.leave(session.color)
+        """Free whatever a client held when it disconnects - a queue slot or a
+        seat in a room."""
+        session.depart()
 
     def _account_for(self, login, new_account):
-        """The account this login is for: a fresh registration for a new name, or
-        the matched account for an existing one - None when the password is wrong."""
         if new_account:
             return self._store.register(login.username, login.password)
         return self._store.authenticate(login.username, login.password)
@@ -77,11 +64,3 @@ class GameService:
         except ProtocolError:
             return None
         return message if isinstance(message, Login) else None
-
-    def _state_line(self):
-        model = replace(
-            self._engine.render_model(),
-            players=self._registry.names(),
-            ratings=self._registry.ratings(),
-        )
-        return encode(StateUpdate(encode_model(model)))

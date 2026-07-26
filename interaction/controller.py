@@ -15,12 +15,17 @@ class Controller:
     where one person moves both. It only gates selection - a UI courtesy so you
     cannot lift the opponent's piece; the server, not this, is what actually
     refuses an out-of-turn move.
+
+    `spectator` is a viewer who may pick up nothing at all. It is distinct from
+    `own_color=None`: that means local play (any piece), whereas a viewer of a
+    networked game must be locked out of every piece.
     """
 
-    def __init__(self, engine, board_mapper, own_color=None):
+    def __init__(self, engine, board_mapper, own_color=None, spectator=False):
         self._engine = engine
         self._mapper = board_mapper
         self._own_color = own_color
+        self._spectator = spectator
         self._selected = None
 
     @property
@@ -69,7 +74,10 @@ class Controller:
 
     def _can_select(self, model, cell):
         """Whether `cell` may be picked up: a free piece there, and - in a
-        networked game - one of this player's own colour."""
+        networked game - one of this player's own colour. A viewer picks up
+        nothing."""
+        if self._spectator:
+            return False
         if not model.selectable(cell):
             return False
         if self._own_color is None:

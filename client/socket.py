@@ -23,9 +23,11 @@ _IDLE_SECONDS = 0.01  # how long the sender naps when there is nothing to send
 
 
 class WebSocketClient:  # pragma: no cover - socket shell, exercised by running it
-    def __init__(self, config, router):
+    def __init__(self, config, router, log, on_lost):
         self._config = config
         self._router = router
+        self._log = log
+        self._on_lost = on_lost  # called with a reason when the connection ends
         self._outgoing = queue.Queue()
         self._thread = None
 
@@ -46,13 +48,17 @@ class WebSocketClient:  # pragma: no cover - socket shell, exercised by running 
     def _run(self):
         try:
             asyncio.run(self._talk())
-        except (OSError, ConnectionClosed):
-            # The server was not there, or went away. The window stays up and
-            # simply stops changing; the player can see that and close it.
-            pass
+        except OSError:
+            # The server was not there to begin with.
+            self._on_lost(self._config.SERVER_UNAVAILABLE_TEXT)
+        except ConnectionClosed:
+            # It went away mid-game. Either way a screen now has a reason to show
+            # instead of a window frozen on its last frame.
+            self._on_lost(self._config.CONNECTION_LOST_TEXT)
 
     async def _talk(self):
         async with connect(self._config.SERVER_URL) as connection:
+            self._log.note("connected " + self._config.SERVER_URL)
             await asyncio.gather(
                 self._receive(connection),
                 self._send_queued(connection),
@@ -60,6 +66,7 @@ class WebSocketClient:  # pragma: no cover - socket shell, exercised by running 
 
     async def _receive(self, connection):
         async for text in connection:
+            self._log.received(text)
             try:
                 self._router.route(text)
             except ProtocolError:
@@ -74,4 +81,5 @@ class WebSocketClient:  # pragma: no cover - socket shell, exercised by running 
             except queue.Empty:
                 await asyncio.sleep(_IDLE_SECONDS)
                 continue
+            self._log.sent(line)
             await connection.send(line)

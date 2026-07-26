@@ -33,6 +33,12 @@ def test_the_end_banner_names_the_winner_and_stays():
     assert banner.text_at(9000 + 10 ** 9) == "BLACK WINS"
 
 
+def test_a_forfeit_end_says_the_opponent_left():
+    banner = BannerAnimation(settings)
+    banner.announce_end(GameEnded(winner="w", at_ms=0, reason=settings.GAME_END_FORFEIT))
+    assert banner.text_at(0) == settings.FORFEIT_BANNER_TEXT.format(winner="WHITE")
+
+
 def test_the_end_banner_replaces_the_start_banner():
     banner = BannerAnimation(settings)
     banner.announce_start(GameStarted(at_ms=0))

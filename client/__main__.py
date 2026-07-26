@@ -3,77 +3,162 @@
 The fourth entry point, and the only one with no game inside it: no board, no
 rules, no clock. It sends what the player does and draws what it is told.
 
-Login is asked in the shell, not the window, as the slide asks: a username is
-read, sent as the first line, and the server answers with a colour or a refusal.
-Everything above the gateway is the same code play.py runs - the window cannot
-tell which of the two it is drawing.
+Login is asked in the shell (username, then a masked password), as the slides
+ask. Then a home screen offers two ways into a game - Play for a quick match, or
+Room to create or join one by id - and once in a room the same window play.py
+uses draws the game, unaware it is remote. Everything above the gateway is the
+same code the local game runs.
 """
 from __future__ import annotations
 
 from client.gateway import NetworkGateway
+from client.home import HomeScreen, run_home
 from client.identity import Identity
 from client.inbox import Inbox
 from client.password import read_password
 from client.router import MessageRouter
 from client.socket import WebSocketClient
-from client.waiting import wait_for_state
+from client.waiting import wait_for_state, waiting_canvas
 from config import settings
 from events.bus import EventBus
+from graphics.room_dialog import ask_room
+from graphics.window import Window
 from interaction.board_mapper import BoardMapper
 from interaction.controller import Controller
-from graphics.window import Window
-from protocol.messages import Login, encode
+from logs.activity_log import file_log, silent_log
+from protocol.messages import CreateRoom, JoinRoom, Login, SeekGame, encode
 from ui.composition import board_origin, build_loop
 
 
-def build_client(config=settings):
+def build_client(config=settings, log=None):
     """The client's half of the graph, minus the window.
 
     The bus is the client's own. Events arriving from the server are published
-    onto it, so sound and banners subscribe exactly as they do locally.
+    onto it, so sound and banners subscribe exactly as they do locally. The log
+    records every line the socket sends or receives; without one wired it is
+    silent, so the code paths are the same either way.
     """
+    log = log or silent_log()
     inbox, bus, identity = Inbox(), EventBus(), Identity()
-    socket = WebSocketClient(config, MessageRouter(inbox, bus, identity))
+    router = MessageRouter(inbox, bus, identity)
+    socket = WebSocketClient(config, router, log, identity.connection_lost)
     gateway = NetworkGateway(inbox, socket.send)
     return inbox, bus, identity, socket, gateway
 
 
 def run(config=settings, ask=input, ask_secret=read_password):  # pragma: no cover - real-time GUI loop
-    # Login is asked in the shell, not the window; the password is echoed as
-    # asterisks. A new username registers, a known one must match.
     username = ask(config.USERNAME_PROMPT).strip() or "guest"
     password = ask_secret(config.PASSWORD_PROMPT)
-    inbox, bus, identity, socket, gateway = build_client(config)
+    log = file_log(config.CLIENT_LOG_PATH, "kfchess.client")
+    inbox, bus, identity, socket, gateway = build_client(config, log)
 
     socket.start()
     socket.send(encode(Login(username, password)))  # the opening line the server expects
 
     window = Window(config.WINDOW_TITLE)
     try:
-        model = wait_for_state(window, inbox, identity, config)
-        if model is None:
-            if identity.rejected():
-                print(identity.rejection_reason())
+        if not _await_login(window, identity, config):
+            _report_failure(identity)
             return
+        print(_greeting(config, identity).format(name=username))
 
-        greeting = (
-            config.ACCOUNT_CREATED_MESSAGE if identity.new_account()
-            else config.WELCOME_BACK_MESSAGE
-        )
-        print(greeting.format(name=username))
-
-        # The model gives the board's extent, which is all the mapper needs; the
-        # client has no board of its own. The colour gates which pieces this
-        # player may pick up, and marks their side in the Hud.
-        color = identity.color()
-        controller = Controller(
-            gateway,
-            BoardMapper(model, config.CELL_SIZE, board_origin(config)),
-            own_color=color,
-        )
-        build_loop(window, gateway, controller, bus, config, own_color=color).run()
+        if not _pick_and_enter(window, socket.send, identity, config):
+            _report_failure(identity)
+            return
+        _play(window, gateway, inbox, bus, identity, config)
+        _report_failure(identity)
     finally:
         window.close()
+
+
+# -- shell / screen flow (all real-time GUI, so untested) -------------------
+
+def _await_login(window, identity, config):  # pragma: no cover
+    """Hold the connecting screen until the server accepts the login."""
+    while True:
+        if identity.logged_in():
+            return True
+        if identity.rejected() or identity.lost():
+            return False
+        window.show(waiting_canvas(config, config.CONNECTING_TEXT))
+        for event in window.poll_events():
+            if event[0] == "quit":
+                return False
+
+
+def _pick_and_enter(window, send, identity, config):  # pragma: no cover
+    """The home screen: choose Play or Room until one puts us in a room. Returns
+    True once in a room, False if the window is closed or the connection drops."""
+    home = HomeScreen(config)
+    while True:
+        identity.retry()
+        choice = run_home(window, home)
+        if choice is None:
+            return False
+        if choice == "play":
+            identity.seeking()
+            send(encode(SeekGame()))
+        elif not _ask_room(send, config):
+            continue  # dialog cancelled - back to the home screen
+        if _await_room(window, identity, config):
+            return True
+        if identity.lost():
+            return False
+
+
+def _ask_room(send, config):  # pragma: no cover
+    """Open the Room dialog and send the chosen command. False if cancelled."""
+    action, room_id = ask_room(config)
+    if action is None:
+        return False
+    send(encode(CreateRoom() if action == "create" else JoinRoom(room_id)))
+    return True
+
+
+def _await_room(window, identity, config):  # pragma: no cover
+    """Wait after Play/Create/Join until the server seats us, or the attempt
+    fails (no opponent, no such room, a drop, or the window closing)."""
+    while True:
+        if identity.in_room():
+            return True
+        if identity.no_opponent() or identity.rejected() or identity.lost():
+            return False
+        window.show(waiting_canvas(config, config.SEARCHING_TEXT))
+        for event in window.poll_events():
+            if event[0] == "quit":
+                return False
+
+
+def _play(window, gateway, inbox, bus, identity, config):  # pragma: no cover
+    """Draw the game until it ends, the window closes, or the connection drops."""
+    model = wait_for_state(window, inbox, identity, config)
+    if model is None:
+        return
+    controller = Controller(
+        gateway,
+        BoardMapper(model, config.CELL_SIZE, board_origin(config)),
+        own_color=identity.color(),
+        spectator=identity.is_spectator(),
+    )
+    build_loop(
+        window, gateway, controller, bus, config,
+        own_color=identity.color(), room_id=identity.room_id(),
+        alive=lambda: not identity.lost(),
+    ).run()
+
+
+def _greeting(config, identity):  # pragma: no cover
+    return (
+        config.ACCOUNT_CREATED_MESSAGE if identity.new_account()
+        else config.WELCOME_BACK_MESSAGE
+    )
+
+
+def _report_failure(identity):  # pragma: no cover
+    """Print why we stopped, if it was a refusal or a dropped connection."""
+    reason = identity.rejection_reason() or identity.loss_reason()
+    if reason is not None:
+        print(reason)
 
 
 if __name__ == "__main__":  # pragma: no cover

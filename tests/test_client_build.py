@@ -8,7 +8,7 @@ from events.bus import EventBus
 from gateway.gateway import GameGateway
 from game.events import GameStarted
 from protocol.events import encode_event
-from protocol.messages import EventNotice, Welcome, encode
+from protocol.messages import EventNotice, RoomEntered, encode
 
 
 def test_the_client_graph_is_wired_without_connecting():
@@ -46,7 +46,7 @@ def test_an_event_off_the_wire_reaches_the_client_bus():
     assert seen == [GameStarted(at_ms=7)]
 
 
-def test_the_welcome_colour_is_what_the_client_will_play():
+def test_the_room_colour_is_what_the_client_will_play():
     inbox, bus, identity, socket, _gateway = build_client(settings)
-    MessageRouter(inbox, bus, identity).route(encode(Welcome("b")))
+    MessageRouter(inbox, bus, identity).route(encode(RoomEntered("b", "7", False)))
     assert identity.color() == "b"

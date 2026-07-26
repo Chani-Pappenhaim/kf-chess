@@ -21,10 +21,11 @@ _MS_PER_SECOND = 1000  # the game counts in milliseconds, asyncio.sleep in secon
 
 
 class WebSocketServer:  # pragma: no cover - socket shell, exercised by running it
-    def __init__(self, config, outbox, service):
+    def __init__(self, config, outbox, service, log):
         self._config = config
         self._outbox = outbox
         self._service = service
+        self._log = log
         self._clients = set()
 
     async def run(self):
@@ -35,22 +36,25 @@ class WebSocketServer:  # pragma: no cover - socket shell, exercised by running 
     async def _client(self, connection):
         """One connection, for as long as it lasts."""
         self._clients.add(connection)
+        self._log.note("connected")
 
         def send(line):
             self._outbox.to(connection, line)
 
         session = None
         try:
-            # The opening line must be a Login. Its replies (a welcome and the
-            # first state, or a rejection) are awaited straight onto the wire,
-            # so a refused client still hears why before the connection closes.
+            # The opening line must be a Login. Its replies (a welcome, or a
+            # rejection) are awaited straight onto the wire, so a refused client
+            # still hears why before the connection closes.
             opening = await connection.recv()
+            self._log.received(opening)
             session, replies = self._service.admit(opening, send)
             for line in replies:
                 await connection.send(line)
             if session is None:
                 return
             async for text in connection:
+                self._log.received(text)
                 try:
                     session.handle(text)
                 except ProtocolError:
@@ -63,6 +67,7 @@ class WebSocketServer:  # pragma: no cover - socket shell, exercised by running 
             if session is not None:
                 self._service.depart(session)
             self._clients.discard(connection)
+            self._log.note("disconnected")
 
     async def _pump(self):
         """Advance the game and flush what it had to say, forever."""
@@ -76,6 +81,7 @@ class WebSocketServer:  # pragma: no cover - socket shell, exercised by running 
         for target, line in self._outbox.drain():
             for client in ((target,) if target is not None else tuple(self._clients)):
                 try:
+                    self._log.sent(line)
                     await client.send(line)
                 except ConnectionClosed:
                     self._clients.discard(client)

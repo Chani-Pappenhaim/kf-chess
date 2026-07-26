@@ -48,6 +48,18 @@ class GameEngine:
         it; it exists so anything that opens on a new game has a cue."""
         self._bus.publish(GameStarted(at_ms=self._arbiter.clock))
 
+    def concede(self, winner, reason):
+        """End the game without a capture - a player conceded, and the other wins.
+
+        Ends it exactly as a king capture would: game over, and GameEnded on the
+        bus. The win came off the board rather than on it, which `reason` records
+        for whoever is listening. A no-op once the game is already over.
+        """
+        if self._game_over:
+            return
+        self._game_over = True
+        self._bus.publish(GameEnded(winner=winner, at_ms=self._arbiter.clock, reason=reason))
+
     @property
     def game_over(self):
         return self._game_over

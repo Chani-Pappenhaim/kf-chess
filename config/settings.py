@@ -125,6 +125,7 @@ PASSWORD_PROMPT = "password: "
 SERVER_STOPPED_MESSAGE = "server stopped"
 REJECT_WRONG_PASSWORD = "wrong password"
 REJECT_GAME_FULL = "the game already has two players"
+REJECT_NO_SUCH_ROOM = "no room with that id"
 
 # Printed in the shell once the server answers a login, so a player knows whether
 # a fresh account was made or a known one was recognised.
@@ -143,3 +144,52 @@ YOU_MARKER = "  <- you"
 ACCOUNTS_DB = os.path.join(_PROJECT_ROOT, "accounts.db")
 STARTING_RATING = 1200
 ELO_K_FACTOR = 32
+
+# --- Rooms, matchmaking, and disconnect (slides 6-7) -----------------------
+# Only server/ and client/ read these. Every duration is measured from the
+# injected tick, never wall-clock, so the server clock stays the only clock.
+
+# "Play" quick-match: pair two seekers whose ratings are within this many
+# points; give up after MATCHMAKING_TIMEOUT_MS and report that none was found.
+MATCHMAKING_ELO_RANGE = 100
+MATCHMAKING_TIMEOUT_MS = 60000
+
+# A disconnected player is given this long to matter before the game resigns in
+# their name; the remaining player watches the seconds tick down.
+DISCONNECT_GRACE_MS = 20000
+
+# How a game ended, carried on GameEnded so the banner can tell a forfeit (a
+# player who left) from a win on the board.
+GAME_END_FORFEIT = "forfeit"
+FORFEIT_BANNER_TEXT = "{winner} WINS - OPPONENT LEFT"
+
+# Home screen (shown after login) and its two buttons.
+PLAY_BUTTON_TEXT = "Play"
+ROOM_BUTTON_TEXT = "Room"
+HOME_BUTTON_WIDTH = 220
+HOME_BUTTON_HEIGHT = 72
+HOME_BUTTON_GAP = 30                       # vertical space between the two buttons
+HOME_BUTTON_COLOR = (210, 210, 210, 255)   # button fill (BGRA)
+
+# Client status lines while finding a game or when something goes wrong.
+SEARCHING_TEXT = "searching for an opponent..."
+NO_OPPONENT_MESSAGE = "no opponent found - press Play to retry"
+SERVER_UNAVAILABLE_TEXT = "server unavailable"
+CONNECTION_LOST_TEXT = "connection lost"
+
+# Drawn on the game screen: the room id up top, the disconnect countdown, and
+# who is watching.
+ROOM_ID_LABEL = "Room {room_id}"
+DISCONNECT_NOTICE = "opponent left - resigning in {seconds}"
+VIEWERS_LABEL = "Watching: {names}"
+
+# The Room dialog (native tkinter): title, prompt, and its three buttons.
+ROOM_DIALOG_TITLE = "Room"
+ROOM_DIALOG_PROMPT = "room id (blank to create)"
+ROOM_DIALOG_CREATE = "Create"
+ROOM_DIALOG_JOIN = "Join"
+ROOM_DIALOG_CANCEL = "Cancel"
+
+# Activity logs, one per side, capturing every line that crosses the wire.
+SERVER_LOG_PATH = os.path.join(_PROJECT_ROOT, "server.log")
+CLIENT_LOG_PATH = os.path.join(_PROJECT_ROOT, "client.log")

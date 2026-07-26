@@ -13,7 +13,9 @@ from protocol.messages import (
     EventNotice,
     HintsReply,
     MoveRequest,
+    NoOpponent,
     Rejected,
+    RoomEntered,
     StateUpdate,
     Welcome,
     encode,
@@ -79,17 +81,25 @@ def test_text_that_is_not_a_message_is_refused():
         router.route("nonsense")
 
 
-def test_a_welcome_tells_this_client_its_colour():
+def test_a_welcome_marks_the_login_accepted():
     _inbox, _bus, identity, router = routed()
-    router.route(encode(Welcome("b")))
-    assert identity.color() == "b"
-    assert identity.new_account() is False  # the default when the flag is unset
-
-
-def test_a_welcome_says_whether_the_login_created_the_account():
-    _inbox, _bus, identity, router = routed()
-    router.route(encode(Welcome("w", True)))
+    router.route(encode(Welcome(True)))
+    assert identity.logged_in() is True
     assert identity.new_account() is True
+
+
+def test_entering_a_room_records_colour_room_and_role():
+    _inbox, _bus, identity, router = routed()
+    router.route(encode(RoomEntered("b", "7", False)))
+    assert identity.color() == "b"
+    assert identity.room_id() == "7"
+    assert identity.is_spectator() is False
+
+
+def test_no_opponent_is_recorded_so_the_home_screen_can_recover():
+    _inbox, _bus, identity, router = routed()
+    router.route(encode(NoOpponent()))
+    assert identity.no_opponent() is True
 
 
 def test_a_rejection_is_recorded_with_its_reason_so_the_client_can_give_up():

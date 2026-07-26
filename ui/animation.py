@@ -29,7 +29,14 @@ class BannerAnimation:
 
     def announce_end(self, event):
         winner = self._config.COLOR_NAMES[event.winner].upper()
-        self._show(self._config.END_BANNER_TEXT.format(winner=winner), _FOREVER)
+        # A forfeit (a player who left) says so, so the winner is not left to
+        # think they were beaten on the board.
+        template = (
+            self._config.FORFEIT_BANNER_TEXT
+            if event.reason == self._config.GAME_END_FORFEIT
+            else self._config.END_BANNER_TEXT
+        )
+        self._show(template.format(winner=winner), _FOREVER)
 
     def text_at(self, clock):
         """What to draw now, or None when nothing is showing. Before the first

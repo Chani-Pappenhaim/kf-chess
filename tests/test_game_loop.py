@@ -101,6 +101,16 @@ def test_tick_dispatches_non_quit_events_to_translator():
     assert translator.handled == [("left", 10, 20), ("right", 30, 40)]
 
 
+def test_tick_returns_false_when_the_alive_predicate_fails():
+    # A networked loop stops itself when the connection drops.
+    engine = _FakeEngine(_model())
+    loop = GameLoop(
+        _FakeWindow([]), engine, _FakeController(), _FakeRenderer(), _FakeHud(),
+        _FakeTranslator(), "base", alive=lambda: False,
+    )
+    assert loop.tick(16) is False
+
+
 def test_tick_returns_false_on_quit_event():
     loop, engine, renderer, hud, window, translator = _loop(
         events=[("left", 1, 1), ("quit",)]

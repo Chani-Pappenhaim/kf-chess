@@ -70,7 +70,7 @@ def test_a_bus_with_no_broadcaster_sends_nothing():
 def test_the_state_goes_out_as_one_message():
     engine = play.build_engine(settings)
     sent = []
-    broadcast_state(engine, {}, {}, sent.append)
+    broadcast_state(engine, {}, {}, (), None, sent.append)
 
     assert len(sent) == 1
     message = decode(sent[0])
@@ -83,7 +83,7 @@ def test_the_names_and_ratings_of_who_is_playing_travel_in_the_state():
     # the engine's own model carries neither.
     engine = play.build_engine(settings)
     sent = []
-    broadcast_state(engine, {"w": "dana"}, {"w": 1516}, sent.append)
+    broadcast_state(engine, {"w": "dana"}, {"w": 1516}, (), None, sent.append)
     restored = decode_model(decode(sent[0]).state)
     assert restored.ratings == {"w": 1516}
 
@@ -93,5 +93,16 @@ def test_the_names_of_who_is_playing_travel_in_the_state():
     # engine's own model carries none.
     engine = play.build_engine(settings)
     sent = []
-    broadcast_state(engine, {"w": "dana", "b": "yossi"}, {}, sent.append)
+    broadcast_state(engine, {"w": "dana", "b": "yossi"}, {}, (), None, sent.append)
     assert decode_model(decode(sent[0]).state).players == {"w": "dana", "b": "yossi"}
+
+
+def test_the_viewers_and_resign_countdown_travel_in_the_state():
+    # Who is watching, and any disconnect countdown, are the room's - folded in
+    # here beside the names, never inside the engine.
+    engine = play.build_engine(settings)
+    sent = []
+    broadcast_state(engine, {}, {}, ("chani", "avi"), 12, sent.append)
+    restored = decode_model(decode(sent[0]).state)
+    assert restored.viewers == ("chani", "avi")
+    assert restored.countdown == 12

@@ -74,3 +74,13 @@ def test_player_names_cross_with_the_state():
 def test_player_ratings_cross_with_the_state():
     model = RenderModel(pieces=(), width=8, height=8, ratings={"w": 1516, "b": 1484})
     assert decode_model(encode_model(model)).ratings == {"w": 1516, "b": 1484}
+
+
+def test_the_viewers_cross_with_the_state():
+    model = RenderModel(pieces=(), width=8, height=8, viewers=("chani", "avi"))
+    assert decode_model(encode_model(model)).viewers == ("chani", "avi")
+
+
+def test_a_disconnect_countdown_crosses_with_the_state():
+    model = RenderModel(pieces=(), width=8, height=8, countdown=12)
+    assert decode_model(encode_model(model)).countdown == 12

@@ -84,6 +84,24 @@ def test_hud_shows_a_bare_score_when_no_one_has_that_colour():
     assert "Score: 0" in canvas.texts
 
 
+def test_hud_shows_the_room_id_on_top():
+    canvas = _canvas()
+    Hud(settings, _NoBanner(), room_id="7").draw(canvas, _model())
+    assert settings.ROOM_ID_LABEL.format(room_id="7") in canvas.texts
+
+
+def test_hud_shows_the_disconnect_countdown_while_it_runs():
+    canvas = _canvas()
+    _hud().draw(canvas, _model(countdown=12))
+    assert settings.DISCONNECT_NOTICE.format(seconds=12) in canvas.texts
+
+
+def test_hud_lists_who_is_watching():
+    canvas = _canvas()
+    _hud().draw(canvas, _model(viewers=("chani", "avi")))
+    assert settings.VIEWERS_LABEL.format(names="chani, avi") in canvas.texts
+
+
 def test_hud_draws_coordinate_labels():
     canvas = _canvas()
     _hud().draw(canvas, _model())
