@@ -82,7 +82,7 @@ BOARD_PX = 8 * CELL_SIZE  # board background is rendered at 8 cells * CELL_SIZE
 # sprites still land on the right cell. Only the graphical path uses these; the
 # text path never offsets the board (BoardMapper defaults to origin 0,0).
 COORD_GUTTER = 28   # strip around the board for the a-h / 1-8 labels
-PANEL_WIDTH = 250   # each side move-list panel (Black on the left, White right)
+PANEL_WIDTH = 150   # each side move-list panel; kept narrow so two windows fit side by side
 TITLE_HEIGHT = 46   # top strip for the "Name:" title
 SCORE_HEIGHT = 40   # score strip, one above and one below the board
 
