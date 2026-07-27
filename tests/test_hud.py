@@ -90,6 +90,19 @@ def test_hud_shows_the_room_id_on_top():
     assert settings.ROOM_ID_LABEL.format(room_id="7") in canvas.texts
 
 
+def test_hud_marks_a_spectators_own_screen_beside_the_room_id():
+    canvas = _canvas()
+    Hud(settings, _NoBanner(), room_id="7", spectator=True).draw(canvas, _model())
+    marked = f"{settings.ROOM_ID_LABEL.format(room_id='7')}  {settings.SPECTATOR_LABEL}"
+    assert marked in canvas.texts
+
+
+def test_hud_does_not_mark_a_player_as_spectator():
+    canvas = _canvas()
+    Hud(settings, _NoBanner(), room_id="7").draw(canvas, _model())
+    assert settings.SPECTATOR_LABEL not in " ".join(canvas.texts)
+
+
 def test_hud_shows_the_disconnect_countdown_while_it_runs():
     canvas = _canvas()
     _hud().draw(canvas, _model(countdown=12))

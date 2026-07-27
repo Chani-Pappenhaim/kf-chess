@@ -182,6 +182,7 @@ CONNECTION_LOST_TEXT = "connection lost"
 ROOM_ID_LABEL = "Room {room_id}"
 DISCONNECT_NOTICE = "opponent left - resigning in {seconds}"
 VIEWERS_LABEL = "Watching: {names}"
+SPECTATOR_LABEL = "spectating"  # marks a viewer's own screen, beside the room id
 
 # The Room dialog (native tkinter): title, prompt, and its three buttons.
 ROOM_DIALOG_TITLE = "Room"

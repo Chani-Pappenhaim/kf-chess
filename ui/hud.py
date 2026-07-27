@@ -24,7 +24,7 @@ _BANNER_CHAR_PX = 46               # the same, at the banner's larger text scale
 
 
 class Hud:
-    def __init__(self, config, banner, own_color=None, room_id=None):
+    def __init__(self, config, banner, own_color=None, room_id=None, spectator=False):
         self._config = config
         self._bx = config.BOARD_ORIGIN_X
         self._by = config.BOARD_ORIGIN_Y
@@ -34,6 +34,7 @@ class Hud:
         self._title = config.WINDOW_TITLE
         self._own_color = own_color  # which side is this player's; None in local play
         self._room_id = room_id      # shown on top; None in local play
+        self._spectator = spectator  # this screen only watches; marked beside the room id
         self._rating_label = config.RATING_LABEL
         self._you_marker = config.YOU_MARKER
         self._title_baseline = config.TITLE_HEIGHT - 16
@@ -69,6 +70,10 @@ class Hud:
         if self._room_id is None:
             return
         text = self._config.ROOM_ID_LABEL.format(room_id=self._room_id)
+        # A viewer's own screen says so, next to the room id, since the state
+        # names the players but never marks the watcher as one.
+        if self._spectator:
+            text = f"{text}  {self._config.SPECTATOR_LABEL}"
         canvas.put_text(text, 12, self._title_baseline, 0.7, _TEXT, 2)
 
     def _draw_countdown(self, canvas, model):

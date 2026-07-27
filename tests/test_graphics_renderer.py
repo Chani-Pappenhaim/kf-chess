@@ -101,6 +101,27 @@ def test_rest_veil_is_gone_once_the_cooldown_completes():
     assert canvas.img[75, 25][2] == 0   # nothing left to veil
 
 
+def test_game_over_freezes_a_moving_piece_on_its_own_cell():
+    # Mid-step when the game ends: no interpolation towards the target - the
+    # piece is drawn on its base cell (0, 0), centred, not slid to col 1.
+    piece = RenderPiece("wP", (0, 0), state="move", target=(0, 2), progress=0.5)
+    frame = _FakeFrame(100)
+    renderer = GraphicsRenderer(_FakeLibrary(frame), 100)
+    model = RenderModel(pieces=(piece,), width=8, height=8, game_over=True)
+    renderer.render(model, _FakeBackground(800))
+    assert frame.drawn_at == [(0, 0)]
+
+
+def test_game_over_clears_the_cooldown_veil():
+    cell = 100
+    renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)
+    piece = RenderPiece("wP", (1, 2), state="long_rest")
+    model = RenderModel(pieces=(piece,), width=8, height=8, game_over=True)
+    canvas = renderer.render(model, _FakeBackground(8 * cell))
+    # nothing acts once the game is over, so no red veil is drawn over a rester.
+    assert canvas.img[150, 250][2] == 0
+
+
 def test_selection_highlight_tints_the_selected_cell():
     cell = 100
     renderer = GraphicsRenderer(_FakeLibrary(_FakeFrame(60)), cell)

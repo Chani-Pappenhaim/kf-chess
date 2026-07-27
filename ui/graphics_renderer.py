@@ -49,12 +49,15 @@ class GraphicsRenderer:
                 canvas, self._origin_x + col * self._cell, self._origin_y + row * self._cell
             )
         self._draw_targets(canvas, targets, model)
+        # Once the game is over nothing acts any more: pieces are drawn frozen on
+        # their own cell, with no mid-step slide, no hop, and no cooldown veil.
+        frozen = model.game_over
         for piece in model.pieces:
             animation = self._sprites.animation(piece.token, piece.state)
             frame = animation.frame_at(clock_ms)
-            x, y = self._top_left(piece, frame)
+            x, y = self._top_left(piece, frame, frozen)
             frame.draw_on(canvas, x, y)
-            if piece.state in _RESTING_STATES:
+            if not frozen and piece.state in _RESTING_STATES:
                 self._draw_rest_veil(canvas, piece)
         return canvas
 
@@ -86,12 +89,12 @@ class GraphicsRenderer:
         veil = solid(self._cell, height, _RESTING_COLOR)
         veil.draw_on(canvas, self._origin_x + col * self._cell, top)
 
-    def _top_left(self, piece, frame):
-        row, col = self._current_cell(piece)
+    def _top_left(self, piece, frame, frozen=False):
+        row, col = piece.cell if frozen else self._current_cell(piece)
         frame_h, frame_w = frame.img.shape[:2]
         x = int(self._origin_x + col * self._cell + (self._cell - frame_w) / 2)
         y = int(self._origin_y + row * self._cell + (self._cell - frame_h) / 2)
-        if piece.state == "jump":
+        if not frozen and piece.state == "jump":
             # Lift the piece along the hop so the jump reads as a jump; clamp to
             # the top edge so a piece on the back rank never draws off-canvas.
             y = max(0, y - self._hop_arc(piece.progress))

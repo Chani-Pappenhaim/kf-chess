@@ -143,6 +143,7 @@ def _play(window, gateway, inbox, bus, identity, config):  # pragma: no cover
     build_loop(
         window, gateway, controller, bus, config,
         own_color=identity.color(), room_id=identity.room_id(),
+        spectator=identity.is_spectator(),
         alive=lambda: not identity.lost(),
     ).run()
 
