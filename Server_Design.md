@@ -304,6 +304,101 @@ Kubernetes לא עובד לבד – נותנים לו כללים והוא מבצ
 
 ---
 
+## הארכיטקטורה הסופית (Target) – מלאי הרכיבים
+
+זהו המיזוג של התכנון שלנו עם ההצעה שהוגשה. הכלל נשמר: כל "אחד" נשבר להרבה זהים,
+וה-`GameEngine` הוא הפוסק היחיד – הלקוח והשערים לעולם לא מכריעים חוקים.
+
+**שכבת כניסה ותקשורת**
+
+| רכיב | תפקיד | מצב | טכנולוגיה |
+|---|---|---|---|
+| Load Balancer | מפזר כל חיבור נכנס; יושב לפני *שני* השערים | Stateless | Cloud LB / nginx |
+| API Gateway | HTTP: התחברות, רשימת חדרים, היסטוריה | Stateless | HTTP service + TLS |
+| WebSocket Gateway | מחזיק חיבורים חיים, מזרים פקודות ומצב | Stateful (חיבורים) | WebSocket service |
+| CDN | הגשת קבצים סטטיים קרוב לשחקן | Stateless (cache) | CDN |
+
+**שכבת הקצאה ומשחק**
+
+| רכיב | תפקיד | מצב | טכנולוגיה |
+|---|---|---|---|
+| Matchmaking | מזווג שחקנים לפי ELO/אזור, פותח חדר | Stateless (תור ב-Redis) | שירות ייעודי |
+| Game Allocator | מחליט איזה Game Server מארח כל חדר | Stateless (מיפוי ב-Redis) | Consistent Hashing |
+| Room Directory | ספר טלפונים "חדר ← שרת" | Stateful | Redis (TTL) |
+| Game Server Shards | מריץ את ה-`GameEngine`, מחזיק את הלוח החי | Stateful (RAM) | קונטיינר Python (הקוד הקיים) |
+
+**שכבת מצב ונתונים**
+
+| רכיב | תפקיד | מצב | טכנולוגיה |
+|---|---|---|---|
+| Shared State | מי מחובר, מיפוי חדרים, תור המתנה | Stateful | Redis |
+| Internal PubSub | תיאום פנימי מהיר וחולף בין השירותים | transport | NATS / Redis PubSub |
+| Durable Event Stream | אירועים שאסור לאבד (`GameEnded`→דירוג/היסטוריה) | Stateful (log) | Kafka |
+| Persistent DB | חשבונות, דירוג, היסטוריה | Stateful | PostgreSQL ← (בקצה: CockroachDB) |
+
+**שכבת תשתית, תפעול ואבטחה**
+
+| רכיב | תפקיד | טכנולוגיה |
+|---|---|---|
+| Containerization | אריזת כל שירות | Docker (מקומי: Docker Compose) |
+| Orchestration | הרצה/ריפוי/הרחבה לפי חדרים פעילים | Kubernetes (קל: K3s) |
+| Observability | ניטור, לוחות, ובדיקות עומס (load tests) | Prometheus / Grafana + k6 |
+| Security | הצפנת תעבורה + גיבוב סיסמאות | TLS + bcrypt/Argon2 |
+| Resilience Guards | reconnect-with-resume, idempotency, rate limiting | לוגיקה בשערים + Redis |
+
+---
+
+## כמה קונטיינרים ושרתים מכל סוג (קיבולת בשיא)
+
+תרחיש להמחשה: ~10M משחקים פעילים בו-זמנית. **סוגי קונטיינרים** = ~11 תפקידים;
+**מספר שרתים** = אלפי instances, כמעט כולם מרוכזים בשני תפקידים.
+
+| שירות | מצב | # בשיא | מדד התרחבות | למה |
+|---|---|---|---|---|
+| Load Balancer | stateless | 2–8 | חיבורים/שנייה | קצה מנוהל, מפזר לאזורים |
+| API Gateway | stateless | ~50–100 | בקשות/שנייה | login/lobby בלבד, קליל |
+| WebSocket Gateway | stateless* | **~1,000–2,000** | **מספר חיבורים פתוחים** | ~10K חיבורים ל-pod → 10M/10K |
+| Matchmaker | stateless | ~20–50 | עומק התור | זיווג מהיר, נשען על Redis |
+| Game Allocator | stateless | ~10–30 | קצב הקצאות | control-plane, נפח נמוך |
+| **Game Server Shards** | **stateful** | **~2,500** | **מספר חדרים פעילים** | 10M ÷ 4,000 חדרים לשרת |
+| Redis (cluster) | stateful | ~50–100 | זיכרון/ops | תורים, sessions, presence |
+| PostgreSQL | stateful | 1 primary + ~5–15 replicas | read QPS / lag | קבוע, מחוץ למסלול החם |
+| NATS | stateful-ish | ~10–30 | msg/s | תיאום פנימי מהיר |
+| Kafka | stateful | ~20–50 brokers | ingest / lag | log עמיד לאירועים |
+| Observability | stateful | ~30–80 | נפח מדדים | Prometheus/Loki/traces |
+
+**התובנה:** ~11 *סוגים*, אבל הצי (אלפי instances) מרוכז בשניים בלבד – **WebSocket
+Gateway** (מתרחב על חיבורים) ו-**Game Server Shards** (מתרחב על חדרים פעילים). כל השאר
+בעשרות. **סוגים ≠ מספר שרתים.**
+
+**מציאות רוחב-הפס:** ~מהלך כל 2 שניות × תוכן זעיר על פני 10M ≈ **~5 Gbit/s בסך הכל** –
+זניח לרשת. הצוואר האמיתי הוא **מספר החיבורים הפתוחים** ו-**CPU של השעונים החיים**, לא התעבורה.
+
+---
+
+## החלטות טכנולוגיה – מה להוסיף מול ההצעה שהוגשה
+
+- **NATS *וגם* Kafka – שניהם.** NATS/Redis PubSub לתיאום פנימי מהיר וחולף (presence,
+  ניתוב); Kafka לזרם אירועים עמיד שאסור לאבד (`GameEnded`→דירוג/היסטוריה). זו גרסת-הרשת
+  של ה-`EventBus` הקיים.
+- **פיצול השער לשניים** (API מול WebSocket) – עומסים שונים שמתרחבים בנפרד, עם Load
+  Balancer יחיד לפני שניהם.
+- **Game Allocator מול Matchmaker** – ה-Matchmaker מחליט *עם מי*; ה-Allocator *איפה*.
+- **PostgreSQL עכשיו, CockroachDB רק בקצה** – אותו SQL, מנוע שגדל לרוחב, רק בפגיעה בתקרה.
+- **Docker Compose (מקומי) ו-K3s (קל)** – אותה ארכיטקטורה בשני גדלים.
+- **Load testing** (k6/locust) – להוכיח שה-scale עובד, לא רק למדוד.
+
+## מה אסור לאבד במיגרציה – Server Authority
+
+- **פוסק יחיד:** `handler._owns()` קורא את הכלי מהלוח, לא ממה שהלקוח טען; אין
+  Client-Side Prediction/Optimistic – מותרים רק interpolation, debounce, reconnect.
+- **שעון יחיד לחדר:** בפיצול לשרתים, אסור ששני shards יריצו `tick` על אותו חדר.
+- **הלוח החי נשאר ב-RAM:** מסלול-המהלך לעולם לא נוגע ב-DB; רק תוצאת סוף-משחק נכתבת.
+- **בידוד per-room:** כל חדר עם bus משלו – לשמר גם מעל PubSub (topic per-room).
+- **חוזה ה-`GameGateway`:** ה-UI מדבר רק מולו; אסור להדליף ידע-רשת ל-`client/`.
+
+---
+
 ## פערים ידועים – ומה מהם באמת קשור ל-scale
 
 עברנו על הקוד ומצאנו כמה בעיות. חשוב להפריד בין שתיים: בעיות שהמעבר ל-scale נועד
