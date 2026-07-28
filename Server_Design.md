@@ -260,39 +260,52 @@ Kubernetes לא עובד לבד – נותנים לו כללים והוא מבצ
 
 לא עושים הכל ביום אחד. סדר הגיוני שכל שלב בו עומד בפני עצמו, ומה כל שלב דורש בפועל:
 
-**1. לארוז את השרת ב-Docker** (בלי לשנות לוגיקה).
-- כתיבת `Dockerfile` שאורז את הקוד, Python ו-`requirements.txt`.
-- בדיקה שהשרת עולה ורץ בתוך קונטיינר בדיוק כמו מקומית.
+לכל שלב: **(דורש)** · **(שינויי קוד מדויקים)** · **(קושי)**. עקרון-על: ה-DI,
+ה-`EventBus` וה-`GameGateway` הקיימים הופכים חלק מהשלבים ל-easy; פיצול החדרים
+ה-stateful בין תהליכים הוא ה-hard.
 
-**2. להוציא את המצב המשותף ל-Redis**, כדי שכמה עותקים יעבדו ביחד.
-- זיהוי המצב שהיום בזיכרון `server/` – מחוברים, מיפוי חדרים, תור המתנה.
-- החלפתו בקריאות/כתיבות ל-Redis, כך שהשרת מפסיק להיות "בעל זיכרון" משלו.
-- הלוח החי נשאר בזיכרון – אותו לא מוציאים.
+**0. Docker + חילוץ הקונפיג.** *דורש:* `Dockerfile`, `docker-compose.yml`, env.
+*קוד:* `config/settings.py` – להחליף `SERVER_HOST/PORT`, `ACCOUNTS_DB` בקריאה מ-`os.environ`
+עם ברירת-מחדל; `build_service(config=...)` כבר מזריק קונפיג. *קושי:* **easy** – אריזה בלבד.
 
-**3. להעביר את הנתונים הקבועים למסד נתונים אמיתי.**
-- הקמת PostgreSQL וטבלאות למשתמשים, דירוג והיסטוריה.
-- חיבור שני מסלולים בלבד: התחברות (אימות סיסמה) וסוף-משחק (כתיבת תוצאה).
-- החלפת כל אחסון מקומי/קובץ שהשתמשנו בו עד היום.
+**1. הוצאת ה-state המשותף ל-Redis.** *דורש:* Redis + client. *קוד:* שלושת ה-singletons –
+`lobby.py` (`_rooms` dict + `_next_id` → **Room Directory** ב-Redis עם מזהה גלובלי; מודול חדש
+`server/room_directory.py`), `matchmaking.py` (`_waiting` list → sorted-set ב-Redis), presence
+של `registry.py` ל-Redis. הלוח החי לא יוצא מה-RAM. *קושי:* **hard** – שבירת ההנחה "תהליך אחד זוכר הכל".
 
-**4. להעמיד Load Balancer ולהריץ כמה עותקים של השרת.**
-- הפיכת השרת ל"חסר-מצב מקומי" (כל המצב כבר ב-Redis/DB משלב 2–3).
-- הצבת Load Balancer מלפנים והרצת כמה עותקים זהים מאחוריו.
+**2. PostgreSQL במקום SQLite.** *דורש:* Postgres + asyncpg. *קוד:* מודול חדש
+`accounts/postgres_store.py` באותו contract; `build_service(store=...)` **כבר** מזריק – רק מחליפים
+ברירת-מחדל. *קושי:* **easy מבנית / hard תפעולית** – ה-`commit()` היום **חוסם** את ה-event loop; חובה
+async/thread-pool. נוגעים רק ב-login וב-`server/ratings.py`.
 
-**5. לפצל את ההתאמה לשירות נפרד עם Directory משותף.**
-- הוצאת לוגיקת ה-matchmaking מהשרת לשירות קטן ועצמאי.
-- כתיבת מיפוי "חדר ← שרת" ל-Redis, וניתוב הצטרפות לפי החיפוש בו.
+**3. API Gateway (HTTP).** *דורש:* שירות HTTP (FastAPI): login/rooms/history. *קוד:* להוציא את
+`GameService.admit()` ל-endpoint (כבר לא-stateful), מנפיק session-token ל-Redis. *קושי:* **easy**.
 
-**6. להעביר את הכל ל-Kubernetes ולהפעיל התרחבות אוטומטית.**
-- הגדרת כל שירות (שרת-משחק, התאמה, שער) כרכיב ב-Kubernetes.
-- הוספת נקודת "בדיקת בריאות", וכלל autoscaling לפי מספר החדרים הפעילים.
+**4. WebSocket Gateway נפרד מ-Game Server.** *דורש:* הפרדת שכבת החיבורים משכבת ה-state. *קוד:*
+`server/socket.py` (`_clients` + `_pump` שהוא ה-tick היחיד) – ה-Gateway מאמת מול Redis-session ומנתב
+את הסוקט ל-shard לפי ה-Directory; `server/outbox.py` → fan-out דרך PubSub. *קושי:* **hard** – "shard
+יחיד מחזיק את השעון של החדר", סטיקיות ברמת-חדר.
 
-**7. להחליף את פרסום האירועים הפנימי ב-Kafka.**
-- החלפת נקודת הפרסום של ה-`EventBus` בשליחה ל-topic ב-Kafka.
-- רישום הצרכנים (דירוג, היסטוריה, אנליטיקה) כמאזינים עצמאיים.
+**5. Game Allocator + Consistent Hashing.** *קוד:* מודול חדש `server/allocator.py` עם hash-ring על
+ה-shards החיים; מחליף את `Lobby.create()`. משחק חי **לא נודד**. *קושי:* **easy יחסית** – `create()` כבר
+נקודת-הזרקה אחת.
 
-**8. להשלים את שכבת ההגנה והתפעול.**
-- הפעלת TLS וגיבוב סיסמאות, הגבלת קצב, ומזהה ייחודי לכל פקודה (מניעת כפילות).
-- חיבור ניטור (Prometheus/Grafana), פריסת גרסאות הדרגתית, והעלאת הקבצים הסטטיים ל-CDN.
+**6. Matchmaker כשירות.** *קוד:* `matchmaking.py` יוצא כשירות; `seek/cancel/tick` נשארים אבל התור
+ב-Redis, וכשמוצא זוג קורא ל-Allocator. פיצול לפי ELO/אזור. *קושי:* **easy**.
+
+**7. NATS (מהיר) + Kafka (עמיד) במקום EventBus הפנימי.** *קוד:* מימוש רשת חדש `events/network_bus.py`
+באותו interface; `build_room` מחליף את ה-`EventBus()` המוזרק; `GameEnded` → Kafka, ו-`ratings`/persistence
+כ-consumers. *קושי:* **easy** – היתרון הארכיטקטוני הגדול.
+
+**8. Observability + Kubernetes/K3s.** *קוד:* health/metrics endpoints; autoscale על **חדרים פעילים**
+(לא CPU); manifests לכל סוג שירות. *קושי:* **easy** – עוטף, לא משנה לוגיקה.
+
+**תיקונים חוצי-שלבים (קדם-scale, לקפל פנימה):** reconnect-with-resume (`room.py::leave`+`join`,
+session-token); idempotency keys (מזהה-פקודה ב-`protocol/messages.py`, dedup ב-`handler.py`);
+rate limiting (מונה per-user בשער).
+
+**קבצים קריטיים למימוש:** `server/__main__.py` (נקודת ה-DI), `server/lobby.py` (הפיצול המרכזי),
+`server/socket.py` (לולאת ה-tick), `server/matchmaking.py` (התור), `accounts/sqlite_store.py` (ה-commit החוסם).
 
 > הערה לגבי הסקיילינג של המסד: מתחילים ב-PostgreSQL פשוט. רק כשמגיעים לתקרת
 > הכתיבה של מכונה אחת עוברים ל-SQL מבוזר (CockroachDB/Spanner) – אותן טבלאות ואותו
