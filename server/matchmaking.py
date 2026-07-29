@@ -6,54 +6,42 @@ within MATCHMAKING_ELO_RANGE; find one and a fresh room opens for the two of the
 joins the queue, where each tick ages them - once MATCHMAKING_TIMEOUT_MS passes
 with no match, they are told none was found and drop out.
 
-The wait is measured from tick(dt), never wall-clock, so this counts on the same
-one clock the rest of the server does.
+The queue itself is a MatchmakingQueue holding only an id and a rating; the live
+sessions stay here, keyed by id, so a queue of plain data can move to Redis while
+reaching a seeker stays local. The wait is measured from tick(dt), never
+wall-clock, so this counts on the same one clock the rest of the server does.
 """
 from __future__ import annotations
 
 from protocol.messages import NoOpponent, encode
 
 
-class _Seeker:
-    __slots__ = ("session", "waited")
-
-    def __init__(self, session):
-        self.session = session
-        self.waited = 0  # ms spent waiting, aged by tick
-
-
 class Matchmaker:
-    def __init__(self, lobby, config):
+    def __init__(self, lobby, queue):
         self._lobby = lobby
-        self._config = config
-        self._waiting = []
+        self._queue = queue
+        self._sessions = {}  # seeker id -> session, to reach a waiting player
 
     def seek(self, session):
         """Pair `session` with a waiting seeker in rating range, or queue it."""
-        match = self._match_for(session.account.rating)
-        if match is None:
-            self._waiting.append(_Seeker(session))
+        seeker_id = session.account.username
+        match_id = self._queue.pop_match(session.account.rating)
+        if match_id is None:
+            self._queue.add(seeker_id, session.account.rating)
+            self._sessions[seeker_id] = session
             return
-        self._waiting.remove(match)
+        opponent = self._sessions.pop(match_id)
         room = self._lobby.create()
-        room.join(match.session)  # waited longer -> White
-        room.join(session)        # newcomer -> Black
+        room.join(opponent)  # waited longer -> White
+        room.join(session)   # newcomer -> Black
 
     def cancel(self, session):
         """Drop a seeker who disconnected before a match was found."""
-        self._waiting = [s for s in self._waiting if s.session is not session]
+        seeker_id = session.account.username
+        self._queue.remove(seeker_id)
+        self._sessions.pop(seeker_id, None)
 
     def tick(self, dt):
-        """Age every waiting seeker; time out those who have waited too long."""
-        for seeker in list(self._waiting):
-            seeker.waited += dt
-            if seeker.waited >= self._config.MATCHMAKING_TIMEOUT_MS:
-                self._waiting.remove(seeker)
-                seeker.session.send(encode(NoOpponent()))
-
-    def _match_for(self, rating):
-        within = self._config.MATCHMAKING_ELO_RANGE
-        for seeker in self._waiting:
-            if abs(seeker.session.account.rating - rating) <= within:
-                return seeker
-        return None
+        """Age every waiting seeker; tell those who waited too long none came."""
+        for seeker_id in self._queue.age(dt):
+            self._sessions.pop(seeker_id).send(encode(NoOpponent()))

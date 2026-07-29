@@ -18,6 +18,7 @@ from logs.activity_log import file_log
 from server.broadcast import subscribe_broadcast
 from server.lobby import Lobby
 from server.matchmaking import Matchmaker
+from server.matchmaking_queue import InMemoryMatchmakingQueue
 from server.outbox import Outbox
 from server.ratings import subscribe_ratings
 from server.registry import PlayerRegistry
@@ -59,7 +60,7 @@ def build_service(config=settings, store=None):
     accounts = store or SqliteAccountStore(config.ACCOUNTS_DB, config.STARTING_RATING)
     outbox = Outbox()
     lobby = Lobby(lambda room_id: build_room(room_id, config, accounts))
-    matchmaker = Matchmaker(lobby, config)
+    matchmaker = Matchmaker(lobby, InMemoryMatchmakingQueue(config))
     return outbox, GameService(lobby, matchmaker, accounts, config)
 
 

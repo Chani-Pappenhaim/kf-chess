@@ -2,6 +2,7 @@ from accounts.store import Account
 from config import settings
 from protocol.messages import NoOpponent, decode
 from server.matchmaking import Matchmaker
+from server.matchmaking_queue import InMemoryMatchmakingQueue
 
 
 class FakeRoom:
@@ -33,7 +34,7 @@ class FakeSession:
 
 def maker():
     lobby = FakeLobby()
-    return Matchmaker(lobby, settings), lobby
+    return Matchmaker(lobby, InMemoryMatchmakingQueue(settings)), lobby
 
 
 def test_two_seekers_in_range_share_one_new_room():
