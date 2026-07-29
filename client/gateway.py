@@ -5,8 +5,9 @@ does, forwards every command to the server, and answers every question from the
 last thing the server sent. The UI above it cannot tell the difference.
 
 Two things follow from the server being the only authority. Time is not advanced
-here - wait() does nothing, because the clock runs there. And a command is sent
-and forgotten: what it did shows up in the next state, like everything else.
+here at all - the clock runs there, so a networked loop is wired with no clock
+step. And a command is sent and forgotten: what it did shows up in the next
+state, like everything else.
 """
 from __future__ import annotations
 
@@ -23,10 +24,6 @@ class NetworkGateway:
 
     def render_model(self):
         return self._inbox.model()
-
-    def wait(self, dt):
-        """Nothing at all. The server owns the clock, and a client that
-        advanced one of its own would drift into a game of its own."""
 
     def request_move(self, start, end):
         model = self._inbox.model()

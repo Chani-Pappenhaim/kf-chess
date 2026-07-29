@@ -34,9 +34,6 @@ class GameGateway(Protocol):
     def request_jump(self, cell) -> None:
         ...
 
-    def wait(self, dt) -> None:
-        ...
-
     def render_model(self) -> RenderModel:
         ...
 
@@ -46,10 +43,10 @@ class NetworkGateway:
 
     Documented here to make the extension point explicit: a remote proxy that
     serialises each command to a server running the authoritative GameEngine,
-    and answers every query from the last state that server sent back. Because
-    the engine's clock is injected via wait(dt), the server alone advances time
-    and every client draws the state it is given. No UI code changes when this
-    replaces the local engine.
+    and answers every query from the last state that server sent back. The
+    server alone advances time - a networked client is wired with no clock step -
+    so every client just draws the state it is given. No UI code changes when
+    this replaces the local engine.
     """
 
     def __init__(self, *args, **kwargs):

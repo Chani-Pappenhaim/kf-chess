@@ -24,18 +24,6 @@ def test_the_model_to_draw_is_the_last_state_received():
     assert gateway.render_model() is inbox.model()
 
 
-def test_waiting_does_nothing_at_all():
-    # The clock lives on the server. A client that advanced one of its own
-    # would drift into a game nobody else is playing.
-    gateway, inbox, sent = connected()
-    before = inbox.model()
-
-    gateway.wait(settings.MOVE_DURATION)
-
-    assert gateway.render_model() is before
-    assert sent == []
-
-
 def test_a_move_goes_out_naming_the_piece_that_is_there():
     gateway, _inbox, sent = connected()
     gateway.request_move((6, 4), (4, 4))     # white pawn e2 -> e4

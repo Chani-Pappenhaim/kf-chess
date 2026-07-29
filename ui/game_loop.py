@@ -1,13 +1,15 @@
 """GameLoop - runs the real-time frame loop, and nothing else.
 
-Its single responsibility is driving one frame after another: advance the game
-by the elapsed wall-clock time, render the read model and HUD onto the base
-canvas, present the result, and route the window's input to the translator -
-until a quit event stops it. It builds nothing; every collaborator (window,
-engine gateway, controller, renderer, hud, translator, base canvas) is injected
-by the composition root in play.py, so this class touches neither cv2 nor any
-engine internals - only the gateway surface (wait, render_model) and the view
-components it was handed.
+Its single responsibility is driving one frame after another: advance the local
+clock, render the read model and HUD onto the base canvas, present the result,
+and route the window's input to the translator - until a quit event stops it. It
+builds nothing; every collaborator (window, engine gateway, controller, renderer,
+hud, translator, base canvas) is injected by the composition root, so this class
+touches neither cv2 nor any engine internals - only the gateway surface
+(render_model) and the view components it was handed.
+
+Advancing the clock is a local-only step, so it is injected (`advance`) rather
+than sat on the gateway for a networked client to leave empty.
 
 The per-frame work lives in tick(dt), kept pure enough to unit-test with fakes;
 run() owns only the wall-clock timing and the window's try/finally lifetime.
@@ -19,7 +21,7 @@ import time
 
 class GameLoop:
     def __init__(self, window, engine, controller, renderer, hud, translator, base,
-                 alive=None):
+                 advance=None, alive=None):
         self._window = window
         self._engine = engine
         self._controller = controller
@@ -27,16 +29,18 @@ class GameLoop:
         self._hud = hud
         self._translator = translator
         self._base = base
+        self._advance = advance  # local clock step; None when the server owns it
         # A predicate the loop checks each frame: False stops it. A networked
         # client passes "is the connection still up"; local play leaves it None
         # and the loop runs until a quit event.
         self._alive = alive or (lambda: True)
 
     def tick(self, dt):
-        """Run one frame: advance the game by `dt` ms, render + present it, and
-        route input. Returns False when a quit event was seen or the loop's
-        `alive` predicate failed (it should stop), True otherwise."""
-        self._engine.wait(dt)
+        """Run one frame: advance the local clock by `dt` ms if there is one,
+        render + present it, and route input. Returns False when a quit event was
+        seen or the loop's `alive` predicate failed (it should stop), else True."""
+        if self._advance is not None:
+            self._advance(dt)
         model = self._engine.render_model()
         canvas = self._renderer.render(
             model, self._base, clock_ms=model.clock,

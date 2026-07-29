@@ -41,15 +41,18 @@ def new_base_canvas(config):
 
 
 def build_loop(window, gateway, controller, bus, config,
-               own_color=None, room_id=None, spectator=False, alive=None):
+               own_color=None, room_id=None, spectator=False, advance=None,
+               alive=None):
     """Everything drawn around `gateway`, wired into a frame loop.
 
     The bus is handed in already carrying whatever the game publishes onto it -
     an engine's own bus when playing locally, one fed from the network when not.
     `own_color` is this player's side and `room_id` its room, so the Hud can mark
     and label them; a local game leaves both None. `spectator` marks a viewer's
-    own screen. `alive` lets a networked loop stop itself when the connection
-    drops; local play leaves it None (runs on).
+    own screen. `advance` is the local clock step - local play passes the engine's
+    own, a networked client leaves it None since the server owns the clock.
+    `alive` lets a networked loop stop itself when the connection drops; local
+    play leaves it None (runs on).
     """
     subscribe_sound(bus, AudioPlayer(), config)
     renderer = GraphicsRenderer(
@@ -65,5 +68,6 @@ def build_loop(window, gateway, controller, bus, config,
         hud=Hud(config, subscribe_banner(bus, config), own_color, room_id, spectator),
         translator=InputTranslator(controller),
         base=new_base_canvas(config),
+        advance=advance,
         alive=alive,
     )

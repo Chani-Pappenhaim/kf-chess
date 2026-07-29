@@ -51,7 +51,7 @@ def run(config=settings):  # pragma: no cover - real-time GUI loop
     bus = EventBus()
     engine, controller = build_game(config, bus)
     engine.start()
-    build_loop(window, engine, controller, bus, config).run()
+    build_loop(window, engine, controller, bus, config, advance=engine.wait).run()
 
 
 if __name__ == "__main__":  # pragma: no cover

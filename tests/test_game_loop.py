@@ -72,7 +72,8 @@ def _loop(events):
     window = _FakeWindow(events)
     translator = _FakeTranslator()
     controller = _FakeController()
-    loop = GameLoop(window, engine, controller, renderer, hud, translator, "base")
+    loop = GameLoop(window, engine, controller, renderer, hud, translator, "base",
+                    advance=engine.wait)
     return loop, engine, renderer, hud, window, translator
 
 
