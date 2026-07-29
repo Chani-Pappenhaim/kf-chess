@@ -113,6 +113,11 @@ SERVER_HOST = os.environ.get("KF_SERVER_HOST", "localhost")
 SERVER_PORT = int(os.environ.get("KF_SERVER_PORT", "8765"))
 SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}"
 
+# Where the shared state lives once the server runs as more than one instance:
+# presence, the room directory, and the matchmaking queue. Defaults to a local
+# Redis; in compose it points at the redis service by name.
+REDIS_URL = os.environ.get("KF_REDIS_URL", "redis://localhost:6379")
+
 # How often the server advances the game and sends the state out. The clock
 # lives on the server alone, so this is the only place time passes: clients
 # draw what they are sent and never advance anything themselves.

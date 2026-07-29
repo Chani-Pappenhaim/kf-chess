@@ -1,6 +1,6 @@
 # Run the server locally in one command: `docker compose up`.
-# A small stand-in for the managed cluster - the same image, just one instance.
-# Redis and PostgreSQL join here in the next steps of the scale plan.
+# A small stand-in for the managed cluster - the same image, plus the Redis that
+# holds the shared state once the server runs as more than one instance.
 services:
   server:
     build: .
@@ -9,3 +9,11 @@ services:
     environment:
       KF_SERVER_HOST: "0.0.0.0"   # bind every interface so the port mapping is reachable
       KF_SERVER_PORT: "8765"
+      KF_REDIS_URL: "redis://redis:6379"   # reach the redis service below by name
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine        # shared state: presence, room directory, matchmaking queue
+    ports:
+      - "6379:6379"
