@@ -106,8 +106,11 @@ END_BANNER_TEXT = "{winner} WINS"
 
 # --- Networked play --------------------------------------------------------
 # Only server/ and client/ read these; the local paths never touch them.
-SERVER_HOST = "localhost"
-SERVER_PORT = 8765
+# Read from the environment so the same image runs anywhere; the defaults keep
+# local runs and the text path unchanged. In a container, KF_SERVER_HOST is set
+# to 0.0.0.0 so the server is reachable from outside it.
+SERVER_HOST = os.environ.get("KF_SERVER_HOST", "localhost")
+SERVER_PORT = int(os.environ.get("KF_SERVER_PORT", "8765"))
 SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}"
 
 # How often the server advances the game and sends the state out. The clock
@@ -141,7 +144,7 @@ YOU_MARKER = "  <- you"
 # Accounts, saved on the server. Every new player starts at STARTING_RATING and
 # moves by ELO after each game; ELO_K_FACTOR is how far a single result can shift
 # a rating. Only server-side account handling reads these.
-ACCOUNTS_DB = os.path.join(_PROJECT_ROOT, "accounts.db")
+ACCOUNTS_DB = os.environ.get("KF_ACCOUNTS_DB", os.path.join(_PROJECT_ROOT, "accounts.db"))
 STARTING_RATING = 1200
 ELO_K_FACTOR = 32
 
