@@ -317,8 +317,19 @@ async/thread-pool. נוגעים רק ב-login וב-`server/ratings.py`.
 נשאר צעד נפרד עתידי – לא מומש כאן. *קושי:* **easy** ברמת הקוד, אבל דורש הבנה מדויקת של סמנטיקת
 pub/sub (ראו הבאג הבא).
 
-**8. Observability + Kubernetes/K3s.** *קוד:* health/metrics endpoints; autoscale על **חדרים פעילים**
-(לא CPU); manifests לכל סוג שירות. *קושי:* **easy** – עוטף, לא משנה לוגיקה.
+**8. Observability + Kubernetes/K3s.** *קוד:* `server/api.py` – `/health` (200 קבוע) ו-`/metrics`
+(`{"active_rooms": ...}`), שניהם דרך `_handler_for` אחד עם `/login`. המספר עצמו זורם מ-`Lobby.room_count()`
+דרך `GameService.active_rooms()`. `k8s/` (חדש) – שישה manifests: `game-server.yaml` (StatefulSet +
+headless Service, כי Consistent Hashing צריך שם יציב לכל shard; `KF_SERVER_ID` מוזרק דרך Downward API
+מ-`metadata.name`; HPA על metric מותאם-אישית `active_rooms` ולא CPU – שרת-משחק חסום על I/O/חיבורים, לא
+על מעבד), `api-gateway.yaml`/`ws-gateway.yaml` (Deployment חסר-מצב + HPA רגיל על CPU; ל-ws-gateway probe
+מסוג `tcpSocket` כי הוא מדבר WebSocket בלבד, בלי HTTP), `redis.yaml`/`postgres.yaml` (StatefulSet + PVC).
+*מה לא נסגר, במפורש:* ה-HPA שמבוסס על `active_rooms` דורש צינור custom-metrics (Prometheus +
+prometheus-adapter) שלא מסופק כאן – ה-manifest אומר *על מה* לסקייל, לא *איך* המדד מגיע ל-K8s.
+`KF_GAME_SERVERS` ב-`configmap.yaml` הוא פול **סטטי** שתואם את מספר ה-replicas הנוכחי; סקיילינג של
+ה-StatefulSet לא מעדכן אותו אוטומטית – זו בעיית ה-directory-vs-hash מחדש, ברמת הפריסה. אומתו רק
+כתחביר YAML תקין (`yaml.safe_load_all`), לא כנגד cluster חי – `kubectl --dry-run=client` נכשל כאן על
+חוסר API server זמין בסביבה. *קושי:* **easy** – עוטף, לא משנה לוגיקה.
 
 **תיקונים חוצי-שלבים (קדם-scale, לקפל פנימה):** reconnect-with-resume (`room.py::leave`+`join`,
 session-token); idempotency keys (מזהה-פקודה ב-`protocol/messages.py`, dedup ב-`handler.py`);

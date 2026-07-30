@@ -1,0 +1,69 @@
+# WebSocket Gateway: stateless (only relays), but holds one open connection
+# per client, so it scales on connection count - not exposed as a metric yet,
+# so this HPA falls back to CPU as a starting point. A plain TCP probe stands
+# in for health, since the gateway speaks WebSocket only, no HTTP.
+apiVersion: v1
+kind: Service
+metadata:
+  name: ws-gateway
+spec:
+  selector:
+    app: ws-gateway
+  ports:
+    - port: 8760
+      targetPort: 8760
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ws-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ws-gateway
+  template:
+    metadata:
+      labels:
+        app: ws-gateway
+    spec:
+      containers:
+        - name: ws-gateway
+          image: kfchess-server:latest
+          command: ["python", "-m", "server.ws_gateway"]
+          ports:
+            - containerPort: 8760
+          envFrom:
+            - configMapRef:
+                name: kfchess-config
+          readinessProbe:
+            tcpSocket:
+              port: 8760
+            initialDelaySeconds: 2
+          livenessProbe:
+            tcpSocket:
+              port: 8760
+            initialDelaySeconds: 5
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "128Mi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ws-gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ws-gateway
+  minReplicas: 2
+  maxReplicas: 50
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
