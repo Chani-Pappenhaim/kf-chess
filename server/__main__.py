@@ -23,6 +23,7 @@ from server.outbox import Outbox
 from server.ratings import subscribe_ratings
 from server.registry import PlayerRegistry
 from server.room import Room
+from server.room_directory import InMemoryRoomDirectory
 from server.service import GameService
 from server.socket import WebSocketServer
 
@@ -59,7 +60,8 @@ def build_service(config=settings, store=None):
     """
     accounts = store or SqliteAccountStore(config.ACCOUNTS_DB, config.STARTING_RATING)
     outbox = Outbox()
-    lobby = Lobby(lambda room_id: build_room(room_id, config, accounts))
+    directory = InMemoryRoomDirectory()
+    lobby = Lobby(lambda room_id: build_room(room_id, config, accounts), directory, config.SERVER_ID)
     matchmaker = Matchmaker(lobby, InMemoryMatchmakingQueue(config), config)
     return outbox, GameService(lobby, matchmaker, accounts, config)
 

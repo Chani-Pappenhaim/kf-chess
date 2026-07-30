@@ -118,6 +118,9 @@ SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}"
 # Redis; in compose it points at the redis service by name.
 REDIS_URL = os.environ.get("KF_REDIS_URL", "redis://localhost:6379")
 
+# This instance's identity, so its room ids stay unique among other instances.
+SERVER_ID = os.environ.get("KF_SERVER_ID", "local")
+
 # How often the server advances the game and sends the state out. The clock
 # lives on the server alone, so this is the only place time passes: clients
 # draw what they are sent and never advance anything themselves.
