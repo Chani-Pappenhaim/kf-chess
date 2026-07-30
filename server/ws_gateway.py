@@ -1,6 +1,6 @@
-"""The WebSocket Gateway: the socket a client actually connects to. It picks a
-Game Server for a fresh session, or reconnects to the one a JoinRoom already
-names, then relays the rest of the session between the two untouched.
+"""The WebSocket Gateway: the socket a client actually connects to. A hash ring
+(GameAllocator) picks a Game Server for a fresh session, or reconnects to the
+one a JoinRoom already names, then relays the rest of the session untouched.
 """
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from websockets.exceptions import ConnectionClosed
 
 from config import settings
 from protocol.messages import JoinRoom, Rejected, decode
+from server.allocator import GameAllocator
 from server.room_directory import RedisRoomDirectory
 
 
@@ -25,25 +26,19 @@ class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running
     def __init__(self, config, pool, directory):
         self._config = config
         self._pool = pool
-        self._addresses = list(pool.values())
+        self._allocator = GameAllocator(pool.keys())
         self._directory = directory
-        self._next = 0
 
     async def run(self):
         async with serve(self._client, self._config.GATEWAY_HOST, self._config.GATEWAY_PORT):
             await asyncio.Future()
-
-    def _pick_address(self):
-        address = self._addresses[self._next % len(self._addresses)]
-        self._next += 1
-        return address
 
     async def _client(self, client_ws):
         try:
             opening = await client_ws.recv()
         except ConnectionClosed:
             return
-        address = self._pick_address()
+        address = self._pool[self._allocator.for_key(opening)]
         upstream = await connect_upstream(address)
         try:
             await upstream.send(opening)
