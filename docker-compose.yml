@@ -1,6 +1,6 @@
 # Run the server locally in one command: `docker compose up`.
-# A small stand-in for the managed cluster - the same image, plus the Redis that
-# holds the shared state once the server runs as more than one instance.
+# A small stand-in for the managed cluster - the same image, plus the Redis and
+# PostgreSQL it uses once the server runs as more than one instance.
 services:
   server:
     build: .
@@ -10,10 +10,21 @@ services:
       KF_SERVER_HOST: "0.0.0.0"   # bind every interface so the port mapping is reachable
       KF_SERVER_PORT: "8765"
       KF_REDIS_URL: "redis://redis:6379"   # reach the redis service below by name
+      KF_DATABASE_URL: "postgresql://kfchess:kfchess@postgres:5432/kfchess"
     depends_on:
       - redis
+      - postgres
 
   redis:
-    image: redis:7-alpine        # shared state: presence, room directory, matchmaking queue
+    image: redis:7-alpine        # shared state: room directory, matchmaking queue
     ports:
       - "6379:6379"
+
+  postgres:
+    image: postgres:16-alpine    # accounts: users, ratings
+    environment:
+      POSTGRES_USER: "kfchess"
+      POSTGRES_PASSWORD: "kfchess"
+      POSTGRES_DB: "kfchess"
+    ports:
+      - "5432:5432"

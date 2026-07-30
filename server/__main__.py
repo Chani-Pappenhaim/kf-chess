@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 
+from accounts.postgres_store import PostgresAccountStore
 from accounts.sqlite_store import SqliteAccountStore
 from board.loaders import load_csv_board
 from config import settings
@@ -56,14 +57,20 @@ def build_service(config=settings, store=None):
     the service the socket drives.
 
     `store` is injectable so a test can pass a fake account store instead of a
-    real SQLite file; the server proper opens the database from config.
+    real database; the server proper opens one from config.
     """
-    accounts = store or SqliteAccountStore(config.ACCOUNTS_DB, config.STARTING_RATING)
+    accounts = store or _default_account_store(config)
     outbox = Outbox()
     directory = InMemoryRoomDirectory()
     lobby = Lobby(lambda room_id: build_room(room_id, config, accounts), directory, config.SERVER_ID)
     matchmaker = Matchmaker(lobby, InMemoryMatchmakingQueue(config), config)
     return outbox, GameService(lobby, matchmaker, accounts, config)
+
+
+def _default_account_store(config):  # pragma: no cover - connects to a real database
+    if config.DATABASE_URL:
+        return PostgresAccountStore(config.DATABASE_URL, config.STARTING_RATING)
+    return SqliteAccountStore(config.ACCOUNTS_DB, config.STARTING_RATING)
 
 
 def run(config=settings):  # pragma: no cover - runs until interrupted
