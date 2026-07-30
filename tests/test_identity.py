@@ -51,6 +51,20 @@ def test_retry_forgets_both_a_failed_search_and_a_rejection():
     assert identity.rejected() is False
 
 
+def test_a_redirect_carries_the_room_to_join():
+    identity = Identity()
+    assert identity.redirect_room_id() is None
+    identity.redirected("7")
+    assert identity.redirect_room_id() == "7"
+
+
+def test_retry_also_forgets_a_redirect():
+    identity = Identity()
+    identity.redirected("7")
+    identity.retry()
+    assert identity.redirect_room_id() is None
+
+
 def test_a_dropped_connection_carries_its_reason():
     identity = Identity()
     identity.connection_lost("connection lost")

@@ -27,6 +27,7 @@ class Identity:
         self._spectator = False   # whether it entered as a viewer
         self._in_room = False     # whether a room has been entered at all
         self._no_opponent = False # whether the last Play search came up empty
+        self._redirect = None     # a room id to reconnect and join, if matched elsewhere
         self._lost = None         # why the connection dropped, if it did
 
     # -- login ------------------------------------------------------------
@@ -96,12 +97,22 @@ class Identity:
         with self._lock:
             self._no_opponent = False
 
+    def redirected(self, room_id):
+        """Matched with a seeker on another server: reconnect and join here."""
+        with self._lock:
+            self._redirect = room_id
+
+    def redirect_room_id(self):
+        with self._lock:
+            return self._redirect
+
     def retry(self):
         """Back to the home screen: forget a search that came up empty or a room
         id that did not exist, so the next attempt starts clean."""
         with self._lock:
             self._no_opponent = False
             self._rejection = None
+            self._redirect = None
 
     # -- connection -------------------------------------------------------
 

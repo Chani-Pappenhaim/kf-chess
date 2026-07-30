@@ -58,20 +58,28 @@ def run(config=settings, ask=input, ask_secret=read_password, login=http_login):
     token, new_account = result
     print(_greeting(config, new_account).format(name=username))
 
-    log = file_log(config.CLIENT_LOG_PATH, "kfchess.client")
-    inbox, bus, identity, socket, gateway = build_client(config, log)
-
-    socket.start()
-    socket.send(encode(Connect(token)))  # the opening line the server expects
-
     window = Window(config.WINDOW_TITLE)
     try:
-        if not _await_login(window, identity, config):
-            _report_failure(identity)
-            return
-        if not _pick_and_enter(window, socket.send, identity, config):
-            _report_failure(identity)
-            return
+        join_room_id = None
+        while True:
+            log = file_log(config.CLIENT_LOG_PATH, "kfchess.client")
+            inbox, bus, identity, socket, gateway = build_client(config, log)
+            socket.start()
+            socket.send(encode(Connect(token)))  # the opening line the server expects
+            if not _await_login(window, identity, config):
+                _report_failure(identity)
+                return
+            entered = (
+                _join_directly(window, socket.send, identity, config, join_room_id)
+                if join_room_id is not None
+                else _pick_and_enter(window, socket.send, identity, config)
+            )
+            if not entered:
+                _report_failure(identity)
+                return
+            join_room_id = identity.redirect_room_id()
+            if join_room_id is None:  # entered a room here - no redirect pending
+                break
         _play(window, gateway, inbox, bus, identity, config)
         _report_failure(identity)
     finally:
@@ -123,10 +131,11 @@ def _ask_room(send, config):  # pragma: no cover
 
 
 def _await_room(window, identity, config):  # pragma: no cover
-    """Wait after Play/Create/Join until the server seats us, or the attempt
-    fails (no opponent, no such room, a drop, or the window closing)."""
+    """Wait after Play/Create/Join until the server seats us, redirects us to
+    a match on another server, or the attempt fails (no opponent, no such
+    room, a drop, or the window closing)."""
     while True:
-        if identity.in_room():
+        if identity.in_room() or identity.redirect_room_id() is not None:
             return True
         if identity.no_opponent() or identity.rejected() or identity.lost():
             return False
@@ -134,6 +143,12 @@ def _await_room(window, identity, config):  # pragma: no cover
         for event in window.poll_events():
             if event[0] == "quit":
                 return False
+
+
+def _join_directly(window, send, identity, config, room_id):  # pragma: no cover
+    """Reconnect after a Redirected: skip the home screen and join straight."""
+    send(encode(JoinRoom(room_id)))
+    return _await_room(window, identity, config)
 
 
 def _play(window, gateway, inbox, bus, identity, config):  # pragma: no cover

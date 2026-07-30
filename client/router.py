@@ -15,6 +15,7 @@ from protocol.messages import (
     EventNotice,
     HintsReply,
     NoOpponent,
+    Redirected,
     Rejected,
     RoomEntered,
     StateUpdate,
@@ -34,6 +35,7 @@ class MessageRouter:
             Rejected: self._rejected,
             RoomEntered: self._entered,
             NoOpponent: self._no_opponent,
+            Redirected: self._redirected,
             StateUpdate: self._state,
             EventNotice: self._event,
             HintsReply: self._hints,
@@ -63,6 +65,9 @@ class MessageRouter:
 
     def _no_opponent(self, _message):
         self._identity.search_failed()
+
+    def _redirected(self, message):
+        self._identity.redirected(message.room_id)
 
     def _state(self, message):
         self._inbox.receive_state(decode_model(message.state))

@@ -1,6 +1,7 @@
-"""The WebSocket Gateway: the socket a client actually connects to. A hash ring
-(GameAllocator) picks a Game Server for a fresh session, or reconnects to the
-one a JoinRoom already names, then relays the rest of the session untouched.
+"""The WebSocket Gateway: the socket a client actually connects to. Room
+placement is a pure hash of the room id (GameAllocator) - the same rule every
+Game Server computes for itself, so nothing is stored to look it up. It relays
+the rest of a session untouched once it is routed.
 """
 from __future__ import annotations
 
@@ -11,23 +12,28 @@ from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
 from config import settings
-from protocol.messages import JoinRoom, Rejected, decode
-from server.allocator import GameAllocator
-from server.room_directory import RedisRoomDirectory
+from protocol.messages import CreateRoom, JoinRoom, Rejected, decode, encode
+from server.allocator import GameAllocator, mint_room_id, parse_pool
 
 
-def parse_pool(spec):
-    """"id=address,id=address" -> {id: address}."""
-    pairs = (entry.split("=", 1) for entry in spec.split(","))
-    return {server_id.strip(): address.strip() for server_id, address in pairs}
+def plan_route(message, first, allocator):
+    """Where a home-screen choice belongs: (target_server_id, line_to_send).
+    A JoinRoom hashes the room it names; a fresh CreateRoom is minted an id and
+    hashed the same way; anything else (SeekGame, an already-id'd CreateRoom)
+    has no target of its own yet, and stays wherever it already is."""
+    if isinstance(message, JoinRoom):
+        return allocator.for_key(message.room_id), first
+    if isinstance(message, CreateRoom) and not message.room_id:
+        room_id = mint_room_id()
+        return allocator.for_key(room_id), encode(CreateRoom(room_id))
+    return None, first
 
 
 class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running it
-    def __init__(self, config, pool, directory):
+    def __init__(self, config, pool):
         self._config = config
         self._pool = pool
         self._allocator = GameAllocator(pool.keys())
-        self._directory = directory
 
     async def run(self):
         async with serve(self._client, self._config.GATEWAY_HOST, self._config.GATEWAY_PORT):
@@ -38,6 +44,7 @@ class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running
             opening = await client_ws.recv()
         except ConnectionClosed:
             return
+        # Any server can authenticate a token; spread these evenly over the pool.
         address = self._pool[self._allocator.for_key(opening)]
         upstream = await connect_upstream(address)
         try:
@@ -55,16 +62,16 @@ class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running
             await upstream.close()
 
     async def _route(self, client_ws, upstream, address, opening):
-        """The client's first home-screen choice: a JoinRoom naming a room on
-        another server reconnects there before it is forwarded."""
+        """The client's first home-screen choice: a room-bound one (Join, or a
+        fresh Create) reconnects to whichever server that room hashes to."""
         try:
             first = await client_ws.recv()
         except ConnectionClosed:
             return upstream, None
-        message = decode(first)
-        if isinstance(message, JoinRoom):
-            target = self._pool.get(self._directory.get(message.room_id))
-            if target is not None and target != address:
+        target_id, first = plan_route(decode(first), first, self._allocator)
+        if target_id is not None:
+            target = self._pool[target_id]
+            if target != address:
                 await upstream.close()
                 upstream = await connect_upstream(target)
                 await upstream.send(opening)
@@ -88,9 +95,8 @@ class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running
 
 def run(config=settings):  # pragma: no cover - runs until interrupted
     pool = parse_pool(config.GAME_SERVERS)
-    directory = RedisRoomDirectory(config.REDIS_URL)
     print(f"KungFu Chess gateway listening on ws://{config.GATEWAY_HOST}:{config.GATEWAY_PORT}")
-    asyncio.run(WebSocketGateway(config, pool, directory).run())
+    asyncio.run(WebSocketGateway(config, pool).run())
 
 
 if __name__ == "__main__":  # pragma: no cover

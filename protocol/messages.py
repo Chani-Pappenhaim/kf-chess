@@ -58,7 +58,11 @@ class SeekGame:
 @dataclass(frozen=True)
 class CreateRoom:
     """The "Create" button: open a new room and put me in it as its first
-    player. The server answers with the generated room id."""
+    player. `room_id` is empty from the client - a Gateway mints one and
+    routes by its hash before forwarding this on; a server with no Gateway in
+    front of it mints its own local id instead."""
+
+    room_id: str = ""
 
 
 @dataclass(frozen=True)
@@ -104,6 +108,14 @@ class NoOpponent:
 
 
 @dataclass(frozen=True)
+class Redirected:
+    """Matched with a seeker on another Game Server: reconnect and send
+    JoinRoom(room_id) instead of waiting here any longer."""
+
+    room_id: str
+
+
+@dataclass(frozen=True)
 class StateUpdate:
     """The whole game state to draw, from protocol.state.encode_model."""
 
@@ -135,6 +147,7 @@ MESSAGE_TYPES = (
     JoinRoom,
     Welcome,
     Rejected,
+    Redirected,
     RoomEntered,
     NoOpponent,
     StateUpdate,

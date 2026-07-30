@@ -98,16 +98,20 @@ SQLite (כותב יחיד שנועל הכל) – וכאן היא נעלמת.
 
 ---
 
-## לדעת מי על איזה שרת (Room Directory)
+## לדעת מי על איזה שרת (חישוב, לא ספר טלפונים)
 
 ברגע שיש כמה שרתי-משחק, צריך לדעת באיזה מהם יושב כל חדר – כי הלוח קיים רק במקום אחד.
 
-**למה זה נחוץ:** שני שחקנים באותו חדר חייבים להגיע לאותו שרת. בלי "ספר טלפונים"
-אין דרך למצוא את השרת הנכון כשמישהו מבקש להצטרף לחדר.
+**למה זה נחוץ:** שני שחקנים באותו חדר חייבים להגיע לאותו שרת. בלי דרך למצוא את השרת
+הנכון, בקשת הצטרפות לא תדע לאן ללכת.
 
-**איך מוסיפים:** שומרים ב-Redis מיפוי פשוט של "חדר ← שרת", כותבים אליו כשנוצר חדר,
-וכל בקשת הצטרפות מסתכלת בו ומנתבת לשרת הנכון. השרת שמחזיק את החדר מרענן את הרשומה
-כל כמה שניות; אם הוא נפל, הרשומה פגה מעצמה.
+**הגרסה הסופית: אין Directory כתוב בכלל.** במקום לשמור מיפוי ב-Redis, מיקום החדר הוא
+**פונקציה טהורה של ה-ID שלו**: `server = allocator.for_key(room_id)` – אותו hash-ring
+משלב 5. כל gateway וכל שרת מחשבים את זה **בעצמם**, בלי round-trip לשום מקום. זה גם
+פותר את "מי יוצר את החדר" – ה-ID נוצר קודם (Gateway או Matchmaker), ורק אז מחשבים
+לאן הוא שייך. **תופעת לוואי חשובה שגילינו בפועל:** גם אם שני שחקנים מותאמים נמצאים
+על אותו שרת, החדר עדיין עשוי להיות שייך (לפי ה-hash) לשרת **שלישי** – ואז השרת ההוא
+חייב לפתוח את החדר **מראש**, לפני שמישהו בכלל מגיע אליו, אחרת אף אחד לא יכול להצטרף.
 
 ---
 
@@ -268,12 +272,11 @@ Kubernetes לא עובד לבד – נותנים לו כללים והוא מבצ
 *קוד:* `config/settings.py` – להחליף `SERVER_HOST/PORT`, `ACCOUNTS_DB` בקריאה מ-`os.environ`
 עם ברירת-מחדל; `build_service(config=...)` כבר מזריק קונפיג. *קושי:* **easy** – אריזה בלבד.
 
-**1. הוצאת ה-state המשותף ל-Redis.** *דורש:* Redis + client. *קוד:* `lobby.py`
-(`_rooms` dict + `_next_id` → **Room Directory** ב-port צמוד, מזהה חדר מרחיב ב-server id
-כדי שלא יתנגש בין שרתים; מודול `server/room_directory.py`), `matchmaking.py` (`_waiting`
-list → port דומה `server/matchmaking_queue.py`, כשה-aging נשאר מקומי לכל שרת – aging
-משותף היה מזדקן ממתין פי-N שרתים). הלוח החי לא יוצא מה-RAM. *קושי:* **hard** – שבירת
-ההנחה "תהליך אחד זוכר הכל".
+**1. הוצאת ה-state המשותף ל-Redis.** *דורש:* Redis + client. *קוד:* `matchmaking.py`
+(`_waiting` list → port `server/matchmaking_queue.py`, כשה-aging נשאר מקומי לכל שרת –
+aging משותף היה מזדקן ממתין פי-N שרתים). מיקום החדרים **לא** נשמר ב-Redis כלל – ראו
+הסעיף "לדעת מי על איזה שרת" למעלה: זו פונקציה טהורה של ה-ID, לא directory. הלוח החי
+לא יוצא מה-RAM. *קושי:* **hard** – שבירת ההנחה "תהליך אחד זוכר הכל".
 
 **Presence נדחה בכוונה.** אין כיום שום קורא ל"מי מחובר, על איזה שרת" בקוד – זה מוזכר
 רק במסמכי התכנון. לבנות port בלי צרכן זה בדיוק אותה מחלת-עיצוב שכבר נמנענו ממנה
@@ -288,24 +291,31 @@ async/thread-pool. נוגעים רק ב-login וב-`server/ratings.py`.
 **3. API Gateway (HTTP).** *דורש:* שירות HTTP (FastAPI): login/rooms/history. *קוד:* להוציא את
 `GameService.admit()` ל-endpoint (כבר לא-stateful), מנפיק session-token ל-Redis. *קושי:* **easy**.
 
-**4. WebSocket Gateway נפרד מ-Game Server.** *דורש:* הפרדת שכבת החיבורים משכבת ה-state. *קוד:*
-`server/socket.py` (`_clients` + `_pump` שהוא ה-tick היחיד) – ה-Gateway מאמת מול Redis-session ומנתב
-את הסוקט ל-shard לפי ה-Directory; `server/outbox.py` → fan-out דרך PubSub. *קושי:* **hard** – "shard
-יחיד מחזיק את השעון של החדר", סטיקיות ברמת-חדר.
+**4. WebSocket Gateway נפרד מ-Game Server.** *קוד:* `server/ws_gateway.py` (חדש) – מקבל חיבור, שולח
+`Connect` לשרת-משחק לפי `Consistent Hashing` (ראו שלב 5), ואז מוגד "מנתב": פעולה תלוית-חדר
+(`JoinRoom`, `CreateRoom` ריק) מחשבת יעד לפי hash של ה-ID ומתחברת מחדש אם צריך; אחרי ההחלטה –
+רק מעביר בתים בשני הכיוונים. **בלי Directory כתוב בכלל** – כל צד מחשב את המיקום בעצמו.
+*קושי:* **hard** – פיצול חיבור/state לתהליכים נפרדים.
 
-**5. Game Allocator + Consistent Hashing.** *קוד:* מודול חדש `server/allocator.py` עם hash-ring על
-ה-shards החיים; מחליף את `Lobby.create()`. משחק חי **לא נודד**. *קושי:* **easy יחסית** – `create()` כבר
-נקודת-הזרקה אחת.
+**5. Game Allocator + Consistent Hashing.** *קוד:* מודול `server/allocator.py` – `GameAllocator`
+(hash-ring), `mint_room_id` (ID קצר וייחודי), `parse_pool`. **מיקום חדר = `allocator.for_key(room_id)`**,
+פונקציה טהורה בלי state – לא רק להקצאת חיבור חדש כמו בטיוטה הראשונה. *קושי:* **easy** – מודול קטן,
+100% נבדק בלי I/O.
 
-**6. Matchmaker כשירות.** *קוד:* `matchmaking_queue.py` מקבל `RedisMatchmakingQueue`, כך שהתור
-משותף בין שרתים. *בעיה שהתגלתה:* התאמה שנמצאת בתור המשותף עשויה להיות של שחקן שמחובר
-לשרת **אחר** – אין לתהליך הזה session אליו. הפתרון: `Matchmaker.seek` מחזיר התאמה כזו לתור
-ומחכה כרגיל, במקום לקרוס. **זיווג מלא בין שרתים שונים ידרוש ערוץ בין-שרתים – מושלם בשלב 7.**
-*קושי:* **easy** ברמת הקוד, אך עם המגבלה הזו עד שיש message bus.
+**6. Matchmaker משותף עם placement סימטרי.** *קוד:* `matchmaking_queue.py` מקבל `RedisMatchmakingQueue`
+(תור משותף, מחולק לפי דירוג). `matchmaking.py` נבנה מחדש: כל שחקן מותאם מקבל את **אותו טיפול**
+(`_settle`) – יושב מקומית אם השרת שלו הוא היעד לפי ה-hash, אחרת מקבל `Redirected(room_id)` ומתחבר
+מחדש. **באג אמיתי שנתפס באימות בפועל (לא רק ביחידה):** אם שני השחקנים המותאמים נמצאים על אותו
+שרת אבל ה-hash שולח את החדר ל**שרת שלישי**, חייבים להודיע לשרת ההוא **ליצור את החדר מראש** –
+אחרת אף אחד לא יכול להצטרף. תוקן ע"י שידור `{room_id, target}` לכל השרתים דרך ה-bus, לא רק לשרת
+שבו יושב השחקן ה"זר". *קושי:* **easy-medium** – התגלה רק תחת ריצה אמיתית עם 2 שרתים.
 
-**7. NATS (מהיר) + Kafka (עמיד) במקום EventBus הפנימי.** *קוד:* מימוש רשת חדש `events/network_bus.py`
-באותו interface; `build_room` מחליף את ה-`EventBus()` המוזרק; `GameEnded` → Kafka, ו-`ratings`/persistence
-כ-consumers. *קושי:* **easy** – היתרון הארכיטקטוני הגדול.
+**7. NATS/Redis Pub-Sub לתיאום פנימי.** *קוד:* `server/pubsub.py` (חדש) – `PubSub` port (`publish`/`poll`,
+לא callback, כדי להתאים ל-tick הקיים), `InMemoryPubSub` (broker משותף = fan-out אמיתי, לא תור-עבודה!
+מנוי מאוחר לא רואה היסטוריה, בדיוק כמו Redis), `RedisPubSub` (מאומת נגד Redis חי). זה מה שמעביר את
+הודעת "מצאתי לך זוג" בין שרתי-המשחק בשלב 6. Kafka (לאירועים עמידים כמו `GameEnded`→דירוג/היסטוריה)
+נשאר צעד נפרד עתידי – לא מומש כאן. *קושי:* **easy** ברמת הקוד, אבל דורש הבנה מדויקת של סמנטיקת
+pub/sub (ראו הבאג הבא).
 
 **8. Observability + Kubernetes/K3s.** *קוד:* health/metrics endpoints; autoscale על **חדרים פעילים**
 (לא CPU); manifests לכל סוג שירות. *קושי:* **easy** – עוטף, לא משנה לוגיקה.
@@ -345,9 +355,8 @@ rate limiting (מונה per-user בשער).
 
 | רכיב | תפקיד | מצב | טכנולוגיה |
 |---|---|---|---|
-| Matchmaking | מזווג שחקנים לפי ELO/אזור, פותח חדר | Stateless (תור ב-Redis) | שירות ייעודי |
-| Game Allocator | מחליט איזה Game Server מארח כל חדר | Stateless (מיפוי ב-Redis) | Consistent Hashing |
-| Room Directory | ספר טלפונים "חדר ← שרת" | Stateful | Redis (TTL) |
+| Matchmaking | מזווג שחקנים לפי דירוג, פותח חדר | Stateless (תור ב-Redis) | שירות ייעודי |
+| Game Allocator | מחשב איזה Game Server מארח כל חדר – מ-ה-ID, בלי לשמור כלום | Stateless | Consistent Hashing |
 | Game Server Shards | מריץ את ה-`GameEngine`, מחזיק את הלוח החי | Stateful (RAM) | קונטיינר Python (הקוד הקיים) |
 
 **שכבת מצב ונתונים**
@@ -430,7 +439,7 @@ Gateway** (מתרחב על חיבורים) ו-**Game Server Shards** (מתרחב
 ### נוצרות בגלל ה-scale – רדומות היום, נשברות בגודל
 
 - **הכל singletons בזיכרון** (Lobby, Matchmaker, מזהי חדרים). על שרת אחד עובד; שובר
-  ריצה של כמה instances. **נפתר** בצעדי Redis + Room Directory + שירות matchmaking.
+  ריצה של כמה instances. **נפתר** בניתוב לפי hash (בלי directory) + תור matchmaking משותף.
 - **SQLite עושה `commit()` חוסם על ה-event loop** – בעומס גבוה מקפיא את כל המשחקים.
   **נפתר חלקית** במעבר ל-PostgreSQL, אך דורש גם async driver / thread pool כדי לא לחסום.
 - **שידור מצב מלא בכל טיק** – בזבזני, אך מזיק רק בקנה מידה. דורש שינוי transport

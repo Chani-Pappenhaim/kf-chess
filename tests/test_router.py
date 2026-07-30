@@ -14,6 +14,7 @@ from protocol.messages import (
     HintsReply,
     MoveRequest,
     NoOpponent,
+    Redirected,
     Rejected,
     RoomEntered,
     StateUpdate,
@@ -99,6 +100,12 @@ def test_no_opponent_is_recorded_so_the_home_screen_can_recover():
     _inbox, _bus, identity, router = routed()
     router.route(encode(NoOpponent()))
     assert identity.no_opponent() is True
+
+
+def test_a_redirect_is_recorded_with_the_room_to_join():
+    _inbox, _bus, identity, router = routed()
+    router.route(encode(Redirected("7")))
+    assert identity.redirect_room_id() == "7"
 
 
 def test_a_rejection_is_recorded_with_its_reason_so_the_client_can_give_up():

@@ -39,8 +39,8 @@ class FakeLobby:
         self.created = []
         self._existing = existing or {}
 
-    def create(self):
-        room = FakeRoom(str(len(self.created) + 1))
+    def create(self, room_id=None):
+        room = FakeRoom(room_id or str(len(self.created) + 1))
         self.created.append(room)
         return room
 
@@ -78,6 +78,12 @@ def test_create_opens_a_room_and_joins_it():
     client, lobby, _mm, _sent = session()
     client.handle(encode(CreateRoom()))
     assert lobby.created[0].joined == [client]
+
+
+def test_create_honours_an_id_already_routed_by_the_gateway():
+    client, lobby, _mm, _sent = session()
+    client.handle(encode(CreateRoom("chosen")))
+    assert lobby.created[0].id == "chosen"
 
 
 def test_join_enters_the_named_room():

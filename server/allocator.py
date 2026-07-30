@@ -1,12 +1,15 @@
-"""Which Game Server should host a fresh session - a hash ring over the live
-pool, so adding or removing a server remaps only the slice of keys near it,
-not the whole pool.
+"""Which Game Server a room lives on - a hash ring over the live pool, so
+adding or removing a server remaps only the slice of keys near it, not the
+whole pool. Placement is a pure function of the room id: no directory is
+stored anywhere, because any server can compute it the same way.
 """
 from __future__ import annotations
 
 import hashlib
+import secrets
 
 _VIRTUAL_NODES = 100  # per server, so the ring is evenly covered
+_ROOM_ID_BYTES = 4    # short enough to read aloud or type
 
 
 class GameAllocator:
@@ -26,6 +29,16 @@ class GameAllocator:
             if point <= ring_point:
                 return self._ring[ring_point]
         return self._ring[self._points[0]]
+
+
+def parse_pool(spec):
+    """"id=address,id=address" -> {id: address}."""
+    pairs = (entry.split("=", 1) for entry in spec.split(","))
+    return {server_id.strip(): address.strip() for server_id, address in pairs}
+
+
+def mint_room_id():
+    return secrets.token_urlsafe(_ROOM_ID_BYTES)
 
 
 def _hash(key):

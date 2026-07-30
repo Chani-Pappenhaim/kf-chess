@@ -82,8 +82,8 @@ class ClientSession:
     def _seek(self, _message):
         self._matchmaker.seek(self)
 
-    def _create(self, _message):
-        self._lobby.create().join(self)
+    def _create(self, message):
+        self._lobby.create(message.room_id or None).join(self)
 
     def _join(self, message):
         room = self._lobby.room(message.room_id)

@@ -1,4 +1,4 @@
-from server.allocator import GameAllocator
+from server.allocator import GameAllocator, mint_room_id, parse_pool
 
 
 def test_a_single_server_gets_every_key():
@@ -26,3 +26,20 @@ def test_adding_a_server_remaps_only_a_slice_of_keys():
     # Plain mod-N hashing would remap nearly everything; a hash ring only
     # remaps the slice that now belongs to the new server (~1/4 here).
     assert 0 < moved < len(keys) * 0.4
+
+
+def test_a_single_server_parses_to_one_entry():
+    assert parse_pool("local=ws://localhost:8765") == {"local": "ws://localhost:8765"}
+
+
+def test_several_servers_parse_to_several_entries():
+    assert parse_pool("a=ws://host-a:8765,b=ws://host-b:8765") == {
+        "a": "ws://host-a:8765",
+        "b": "ws://host-b:8765",
+    }
+
+
+def test_minted_room_ids_are_short_and_distinct():
+    a, b = mint_room_id(), mint_room_id()
+    assert a != b
+    assert len(a) < 12
