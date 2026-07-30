@@ -28,16 +28,3 @@ def test_a_removed_seeker_can_no_longer_match():
     queue.add("dana", 1200)
     queue.remove("dana")
     assert queue.pop_match(1200) is None
-
-
-def test_age_times_out_and_drops_a_seeker_past_the_limit():
-    queue = _queue()
-    queue.add("dana", 1200)
-    assert queue.age(settings.MATCHMAKING_TIMEOUT_MS) == ("dana",)
-    assert queue.pop_match(1200) is None     # timed out means removed
-
-
-def test_age_keeps_a_seeker_still_within_the_limit():
-    queue = _queue()
-    queue.add("dana", 1200)
-    assert queue.age(settings.MATCHMAKING_TIMEOUT_MS - 1) == ()

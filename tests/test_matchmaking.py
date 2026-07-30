@@ -34,7 +34,7 @@ class FakeSession:
 
 def maker():
     lobby = FakeLobby()
-    return Matchmaker(lobby, InMemoryMatchmakingQueue(settings)), lobby
+    return Matchmaker(lobby, InMemoryMatchmakingQueue(settings), settings), lobby
 
 
 def test_two_seekers_in_range_share_one_new_room():
