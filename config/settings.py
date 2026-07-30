@@ -129,6 +129,21 @@ SERVER_ID = os.environ.get("KF_SERVER_ID", "local")
 # Accounts store: PostgreSQL when set, else the local SQLite file below.
 DATABASE_URL = os.environ.get("KF_DATABASE_URL", "")
 
+# Set to run several Game Servers behind a WebSocket Gateway: the room
+# directory and login tokens move to Redis (shared), instead of this one
+# process's memory. Off by default, so a single `python -m server` still needs
+# nothing but itself.
+DISTRIBUTED = os.environ.get("KF_DISTRIBUTED", "") != ""
+
+# The WebSocket Gateway: the public socket a client actually connects to. It
+# picks a Game Server for a fresh session, or the one a JoinRoom already names.
+GATEWAY_HOST = os.environ.get("KF_GATEWAY_HOST", "localhost")
+GATEWAY_PORT = int(os.environ.get("KF_GATEWAY_PORT", "8760"))
+
+# The Game Servers the Gateway routes to: "id=ws://host:port" pairs, comma
+# separated, each id matching that server's own SERVER_ID.
+GAME_SERVERS = os.environ.get("KF_GAME_SERVERS", "local=ws://localhost:8765")
+
 # How often the server advances the game and sends the state out. The clock
 # lives on the server alone, so this is the only place time passes: clients
 # draw what they are sent and never advance anything themselves.

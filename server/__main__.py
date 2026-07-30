@@ -25,10 +25,10 @@ from server.outbox import Outbox
 from server.ratings import subscribe_ratings
 from server.registry import PlayerRegistry
 from server.room import Room
-from server.room_directory import InMemoryRoomDirectory
+from server.room_directory import InMemoryRoomDirectory, RedisRoomDirectory
 from server.service import GameService
 from server.socket import WebSocketServer
-from server.tokens import InMemoryTokenStore
+from server.tokens import InMemoryTokenStore, RedisTokenStore
 
 
 def load_board(config):
@@ -54,19 +54,19 @@ def build_room(room_id, config, store):
     return room
 
 
-def build_service(config=settings, store=None, tokens=None):
+def build_service(config=settings, store=None, tokens=None, directory=None):
     """The server, wired to host many games. Returns the outbox (to drain) and
     the service the socket drives.
 
-    `store` and `tokens` are injectable so a test can pass fakes instead of a
-    real database and a real token store; the server proper builds both from
+    `store`, `tokens`, and `directory` are injectable so a test can pass fakes
+    instead of real infrastructure; the server proper builds all three from
     config and shares them with the API Gateway (see run()).
     """
     accounts = store or _default_account_store(config)
     session_tokens = tokens or InMemoryTokenStore()
+    room_directory = directory or InMemoryRoomDirectory()
     outbox = Outbox()
-    directory = InMemoryRoomDirectory()
-    lobby = Lobby(lambda room_id: build_room(room_id, config, accounts), directory, config.SERVER_ID)
+    lobby = Lobby(lambda room_id: build_room(room_id, config, accounts), room_directory, config.SERVER_ID)
     matchmaker = Matchmaker(lobby, InMemoryMatchmakingQueue(config), config)
     return outbox, GameService(lobby, matchmaker, session_tokens, config)
 
@@ -79,9 +79,16 @@ def _default_account_store(config):  # pragma: no cover - connects to a real dat
 
 def run(config=settings):  # pragma: no cover - runs until interrupted
     accounts = _default_account_store(config)
-    tokens = InMemoryTokenStore()
+    # Distributed: tokens and the room directory move to Redis, shared with the
+    # other Game Servers and the WebSocket Gateway routing between them.
+    if config.DISTRIBUTED:
+        tokens = RedisTokenStore(config.REDIS_URL)
+        directory = RedisRoomDirectory(config.REDIS_URL)
+    else:
+        tokens = InMemoryTokenStore()
+        directory = InMemoryRoomDirectory()
     ApiGateway(config, accounts, tokens).start()
-    outbox, service = build_service(config, store=accounts, tokens=tokens)
+    outbox, service = build_service(config, store=accounts, tokens=tokens, directory=directory)
     log = file_log(config.SERVER_LOG_PATH, "kfchess.server")
     try:
         print(f"KungFu Chess server listening on {config.SERVER_URL}")
