@@ -32,6 +32,10 @@ class GameService:
         self._lobby.tick(dt)
         self._matchmaker.tick(dt)
 
+    def active_rooms(self):
+        """How many games this server is running - the autoscaling signal."""
+        return self._lobby.room_count()
+
     def admit(self, opening, send):
         """Resolve a client's opening Connect(token). Returns (session,
         replies): a home-screen session to run, or None when refused, and the

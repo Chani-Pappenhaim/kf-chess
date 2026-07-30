@@ -93,8 +93,8 @@ def run(config=settings):  # pragma: no cover - runs until interrupted
         tokens = InMemoryTokenStore()
         queue = InMemoryMatchmakingQueue(config)
         bus = None
-    ApiGateway(config, accounts, tokens).start()
     outbox, service = build_service(config, store=accounts, tokens=tokens, queue=queue, bus=bus)
+    ApiGateway(config, accounts, tokens, service).start()
     log = file_log(config.SERVER_LOG_PATH, "kfchess.server")
     try:
         print(f"KungFu Chess server listening on {config.SERVER_URL}")

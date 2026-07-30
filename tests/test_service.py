@@ -80,6 +80,9 @@ class _FakeLobby:
     def tick(self, dt):
         self.ticks.append(dt)
 
+    def room_count(self):
+        return 3
+
 
 class _FakeMatchmaker:
     def __init__(self):
@@ -107,3 +110,8 @@ def test_departing_lets_the_session_clean_up_after_itself():
     session = _FakeSession()
     GameService(_FakeLobby(), _FakeMatchmaker(), None, settings).depart(session)
     assert session.departed is True
+
+
+def test_active_rooms_reports_the_lobbys_count():
+    service = GameService(_FakeLobby(), _FakeMatchmaker(), None, settings)
+    assert service.active_rooms() == 3

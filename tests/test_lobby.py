@@ -72,3 +72,11 @@ def test_an_emptied_room_is_forgotten():
     room.is_empty = True
     hall.tick(1)
     assert hall.room(room.id) is None
+
+
+def test_room_count_reflects_what_is_live():
+    hall, _ = lobby()
+    assert hall.room_count() == 0
+    hall.create()
+    hall.create()
+    assert hall.room_count() == 2

@@ -1,5 +1,5 @@
-"""The API Gateway: login over HTTP, so the game socket only ever admits an
-already-issued token - nothing else needs the socket.
+"""The API Gateway: login, health, and metrics over HTTP - the non-realtime
+side of the server. The game socket only ever admits an already-issued token.
 """
 from __future__ import annotations
 
@@ -20,26 +20,48 @@ def handle_login(store, tokens, config, body):
     return 200, {"token": tokens.issue(account), "new_account": new_account}
 
 
+def handle_health():
+    """The liveness check: this process can answer at all."""
+    return 200, {"status": "ok"}
+
+
+def handle_metrics(service):
+    """The autoscaling signal: how many games this server is running."""
+    return 200, {"active_rooms": service.active_rooms()}
+
+
 class ApiGateway:  # pragma: no cover - http shell, exercised by running it
-    def __init__(self, config, store, tokens):
+    def __init__(self, config, store, tokens, service):
         self._config = config
         self._store = store
         self._tokens = tokens
+        self._service = service
 
     def start(self):
-        """Serve /login on a background thread; the game socket runs the rest."""
-        handler = _login_handler(self._store, self._tokens, self._config)
+        """Serve /login, /health, /metrics on a background thread; the game
+        socket runs the rest."""
+        handler = _handler_for(self._store, self._tokens, self._service, self._config)
         httpd = ThreadingHTTPServer((self._config.API_HOST, self._config.API_PORT), handler)
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
 
-def _login_handler(store, tokens, config):  # pragma: no cover - http shell
-    class LoginHandler(BaseHTTPRequestHandler):
+def _handler_for(store, tokens, service, config):  # pragma: no cover - http shell
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            if self.path == "/health":
+                self._reply(*handle_health())
+            elif self.path == "/metrics":
+                self._reply(*handle_metrics(service))
+            else:
+                self._reply(404, {"reason": "not found"})
+
         def do_POST(self):
+            if self.path != "/login":
+                self._reply(404, {"reason": "not found"})
+                return
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length))
-            status, payload = handle_login(store, tokens, config, body)
-            self._reply(status, payload)
+            self._reply(*handle_login(store, tokens, config, body))
 
         def _reply(self, status, payload):
             data = json.dumps(payload).encode("utf-8")
@@ -52,4 +74,4 @@ def _login_handler(store, tokens, config):  # pragma: no cover - http shell
         def log_message(self, *args):
             pass  # server.log already covers activity
 
-    return LoginHandler
+    return Handler

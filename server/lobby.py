@@ -35,6 +35,10 @@ class Lobby:
         """The room with this id, or None if there is none."""
         return self._rooms.get(room_id)
 
+    def room_count(self):
+        """How many rooms are live here right now - the autoscaling signal."""
+        return len(self._rooms)
+
     def tick(self, dt):
         """Advance every room, then drop any that no one is left in."""
         for room in list(self._rooms.values()):

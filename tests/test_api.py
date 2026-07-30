@@ -1,5 +1,5 @@
 from config import settings
-from server.api import handle_login
+from server.api import handle_health, handle_login, handle_metrics
 from server.tokens import InMemoryTokenStore
 from tests.support import FakeAccountStore
 
@@ -35,3 +35,16 @@ def test_the_issued_token_resolves_to_the_account():
     tokens = InMemoryTokenStore()
     _status, payload = login(FakeAccountStore(settings.STARTING_RATING), tokens, "dana", "pw")
     assert tokens.resolve(payload["token"]).username == "dana"
+
+
+def test_health_reports_ok():
+    assert handle_health() == (200, {"status": "ok"})
+
+
+class _FakeService:
+    def active_rooms(self):
+        return 7
+
+
+def test_metrics_reports_the_active_room_count():
+    assert handle_metrics(_FakeService()) == (200, {"active_rooms": 7})
