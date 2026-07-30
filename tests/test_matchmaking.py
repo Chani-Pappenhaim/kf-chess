@@ -69,6 +69,21 @@ def test_a_seeker_is_not_timed_out_early():
     assert seeker.sent == []
 
 
+def test_a_match_from_another_server_is_handed_back_and_this_seeker_waits():
+    # A shared queue can hold a seeker whose session lives on another Game
+    # Server; this process has no session to seat, so it hands the match back.
+    lobby = FakeLobby()
+    queue = InMemoryMatchmakingQueue(settings)
+    queue.add("ghost", 1200)
+    mm = Matchmaker(lobby, queue, settings)
+
+    mm.seek(FakeSession("dana", 1200))
+
+    assert lobby.rooms == []
+    assert queue.pop_match(1200) == ("ghost", 1200)  # handed back
+    assert queue.pop_match(1200) == ("dana", 1200)   # this seeker also waits
+
+
 def test_a_cancelled_seeker_leaves_the_queue():
     mm, lobby = maker()
     gone = FakeSession("dana", 1200)

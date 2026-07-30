@@ -1,6 +1,12 @@
 """Pairing two players: a seeker meets anyone waiting within MATCHMAKING_ELO_RANGE,
 else joins the queue and times out after MATCHMAKING_TIMEOUT_MS. Each server ages
 only its own seekers, so a shared queue is not aged many times over.
+
+A match popped from a shared queue may belong to a seeker connected to another
+Game Server - this process holds no session for them, so it cannot seat them in
+a room here. It hands that entry back to the queue and waits like a fresh
+seeker; pairing seekers who are on different servers is completed once servers
+share a message bus (see the roadmap).
 """
 from __future__ import annotations
 
@@ -23,16 +29,19 @@ class Matchmaker:
         self._waiting = {}  # id -> _Waiting
 
     def seek(self, session):
-        seeker_id = session.account.username
-        match_id = self._queue.pop_match(session.account.rating)
-        if match_id is None:
-            self._queue.add(seeker_id, session.account.rating)
-            self._waiting[seeker_id] = _Waiting(session)
-            return
-        opponent = self._waiting.pop(match_id).session
-        room = self._lobby.create()
-        room.join(opponent)  # waited longer -> White
-        room.join(session)   # newcomer -> Black
+        seeker_id, rating = session.account.username, session.account.rating
+        match = self._queue.pop_match(rating)
+        if match is not None:
+            match_id, match_rating = match
+            opponent = self._waiting.pop(match_id, None)
+            if opponent is not None:
+                room = self._lobby.create()
+                room.join(opponent.session)  # waited longer -> White
+                room.join(session)           # newcomer -> Black
+                return
+            self._queue.add(match_id, match_rating)  # theirs, not reachable here
+        self._queue.add(seeker_id, rating)
+        self._waiting[seeker_id] = _Waiting(session)
 
     def cancel(self, session):
         seeker_id = session.account.username

@@ -297,8 +297,11 @@ async/thread-pool. נוגעים רק ב-login וב-`server/ratings.py`.
 ה-shards החיים; מחליף את `Lobby.create()`. משחק חי **לא נודד**. *קושי:* **easy יחסית** – `create()` כבר
 נקודת-הזרקה אחת.
 
-**6. Matchmaker כשירות.** *קוד:* `matchmaking.py` יוצא כשירות; `seek/cancel/tick` נשארים אבל התור
-ב-Redis, וכשמוצא זוג קורא ל-Allocator. פיצול לפי ELO/אזור. *קושי:* **easy**.
+**6. Matchmaker כשירות.** *קוד:* `matchmaking_queue.py` מקבל `RedisMatchmakingQueue`, כך שהתור
+משותף בין שרתים. *בעיה שהתגלתה:* התאמה שנמצאת בתור המשותף עשויה להיות של שחקן שמחובר
+לשרת **אחר** – אין לתהליך הזה session אליו. הפתרון: `Matchmaker.seek` מחזיר התאמה כזו לתור
+ומחכה כרגיל, במקום לקרוס. **זיווג מלא בין שרתים שונים ידרוש ערוץ בין-שרתים – מושלם בשלב 7.**
+*קושי:* **easy** ברמת הקוד, אך עם המגבלה הזו עד שיש message bus.
 
 **7. NATS (מהיר) + Kafka (עמיד) במקום EventBus הפנימי.** *קוד:* מימוש רשת חדש `events/network_bus.py`
 באותו interface; `build_room` מחליף את ה-`EventBus()` המוזרק; `GameEnded` → Kafka, ו-`ratings`/persistence
