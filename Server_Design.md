@@ -268,10 +268,17 @@ Kubernetes לא עובד לבד – נותנים לו כללים והוא מבצ
 *קוד:* `config/settings.py` – להחליף `SERVER_HOST/PORT`, `ACCOUNTS_DB` בקריאה מ-`os.environ`
 עם ברירת-מחדל; `build_service(config=...)` כבר מזריק קונפיג. *קושי:* **easy** – אריזה בלבד.
 
-**1. הוצאת ה-state המשותף ל-Redis.** *דורש:* Redis + client. *קוד:* שלושת ה-singletons –
-`lobby.py` (`_rooms` dict + `_next_id` → **Room Directory** ב-Redis עם מזהה גלובלי; מודול חדש
-`server/room_directory.py`), `matchmaking.py` (`_waiting` list → sorted-set ב-Redis), presence
-של `registry.py` ל-Redis. הלוח החי לא יוצא מה-RAM. *קושי:* **hard** – שבירת ההנחה "תהליך אחד זוכר הכל".
+**1. הוצאת ה-state המשותף ל-Redis.** *דורש:* Redis + client. *קוד:* `lobby.py`
+(`_rooms` dict + `_next_id` → **Room Directory** ב-port צמוד, מזהה חדר מרחיב ב-server id
+כדי שלא יתנגש בין שרתים; מודול `server/room_directory.py`), `matchmaking.py` (`_waiting`
+list → port דומה `server/matchmaking_queue.py`, כשה-aging נשאר מקומי לכל שרת – aging
+משותף היה מזדקן ממתין פי-N שרתים). הלוח החי לא יוצא מה-RAM. *קושי:* **hard** – שבירת
+ההנחה "תהליך אחד זוכר הכל".
+
+**Presence נדחה בכוונה.** אין כיום שום קורא ל"מי מחובר, על איזה שרת" בקוד – זה מוזכר
+רק במסמכי התכנון. לבנות port בלי צרכן זה בדיוק אותה מחלת-עיצוב שכבר נמנענו ממנה
+(interface עם מתודה שאף אחד לא צריך), רק ברמת מודול. Presence ייבנה כשנממש
+**reconnect-with-resume** (הפער הידוע למטה) – שם נדע איזו צורת נתונים באמת נחוצה.
 
 **2. PostgreSQL במקום SQLite.** *דורש:* Postgres + asyncpg. *קוד:* מודול חדש
 `accounts/postgres_store.py` באותו contract; `build_service(store=...)` **כבר** מזריק – רק מחליפים
