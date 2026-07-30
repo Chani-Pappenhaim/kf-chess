@@ -20,13 +20,12 @@ from protocol.records import by_name, decode_record, encode_record
 # -- client to server ------------------------------------------------------
 
 @dataclass(frozen=True)
-class Login:
-    """The first thing a client says: who is joining, and their password. Sent
-    before any command, so the server can authenticate and hand out a colour
-    before it takes orders."""
+class Connect:
+    """The first thing a client says: the token an earlier HTTP login was given.
+    Sent before any command, so the server can admit the session before it takes
+    orders."""
 
-    username: str
-    password: str
+    token: str
 
 
 @dataclass(frozen=True)
@@ -74,17 +73,13 @@ class JoinRoom:
 
 @dataclass(frozen=True)
 class Welcome:
-    """Login accepted. Carries only whether the login just created the account
-    or matched an existing one, for the greeting shown in the shell. The colour
-    is not known yet - it is decided when this client enters a room, since a full
-    room makes the joiner a viewer rather than a player (see RoomEntered)."""
-
-    new_account: bool = False
+    """The token was accepted. The greeting (new account or returning) was
+    already shown from the HTTP login reply; this only opens the game socket."""
 
 
 @dataclass(frozen=True)
 class Rejected:
-    """The other answer to a Login: the credentials did not match. A full room
+    """The other answer to a Connect: the token did not resolve. A full room
     does not refuse a client - it takes them in as a viewer instead."""
 
     reason: str
@@ -131,7 +126,7 @@ class HintsReply:
 
 
 MESSAGE_TYPES = (
-    Login,
+    Connect,
     MoveRequest,
     JumpRequest,
     HintsRequest,

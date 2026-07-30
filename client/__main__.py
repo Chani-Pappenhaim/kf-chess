@@ -3,11 +3,12 @@
 The fourth entry point, and the only one with no game inside it: no board, no
 rules, no clock. It sends what the player does and draws what it is told.
 
-Login is asked in the shell (username, then a masked password), as the slides
-ask. Then a home screen offers two ways into a game - Play for a quick match, or
-Room to create or join one by id - and once in a room the same window play.py
-uses draws the game, unaware it is remote. Everything above the gateway is the
-same code the local game runs.
+Login is asked in the shell (username, then a masked password) and sent over
+HTTP to the API Gateway, which answers with a token - the game socket never
+sees the password. Then a home screen offers two ways into a game - Play for a
+quick match, or Room to create or join one by id - and once in a room the same
+window play.py uses draws the game, unaware it is remote. Everything above the
+gateway is the same code the local game runs.
 """
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ from client.gateway import NetworkGateway
 from client.home import HomeScreen, run_home
 from client.identity import Identity
 from client.inbox import Inbox
+from client.login import http_login
 from client.password import read_password
 from client.router import MessageRouter
 from client.socket import WebSocketClient
@@ -26,7 +28,7 @@ from graphics.window import Window
 from interaction.board_mapper import BoardMapper
 from interaction.controller import Controller
 from logs.activity_log import file_log, silent_log
-from protocol.messages import CreateRoom, JoinRoom, Login, SeekGame, encode
+from protocol.messages import Connect, CreateRoom, JoinRoom, SeekGame, encode
 from ui.composition import board_origin, build_loop
 
 
@@ -46,22 +48,27 @@ def build_client(config=settings, log=None):
     return inbox, bus, identity, socket, gateway
 
 
-def run(config=settings, ask=input, ask_secret=read_password):  # pragma: no cover - real-time GUI loop
+def run(config=settings, ask=input, ask_secret=read_password, login=http_login):  # pragma: no cover - real-time GUI loop
     username = ask(config.USERNAME_PROMPT).strip() or "guest"
     password = ask_secret(config.PASSWORD_PROMPT)
+    result = login(config, username, password)
+    if result is None:
+        print(config.REJECT_WRONG_PASSWORD)
+        return
+    token, new_account = result
+    print(_greeting(config, new_account).format(name=username))
+
     log = file_log(config.CLIENT_LOG_PATH, "kfchess.client")
     inbox, bus, identity, socket, gateway = build_client(config, log)
 
     socket.start()
-    socket.send(encode(Login(username, password)))  # the opening line the server expects
+    socket.send(encode(Connect(token)))  # the opening line the server expects
 
     window = Window(config.WINDOW_TITLE)
     try:
         if not _await_login(window, identity, config):
             _report_failure(identity)
             return
-        print(_greeting(config, identity).format(name=username))
-
         if not _pick_and_enter(window, socket.send, identity, config):
             _report_failure(identity)
             return
@@ -148,11 +155,8 @@ def _play(window, gateway, inbox, bus, identity, config):  # pragma: no cover
     ).run()
 
 
-def _greeting(config, identity):  # pragma: no cover
-    return (
-        config.ACCOUNT_CREATED_MESSAGE if identity.new_account()
-        else config.WELCOME_BACK_MESSAGE
-    )
+def _greeting(config, new_account):  # pragma: no cover
+    return config.ACCOUNT_CREATED_MESSAGE if new_account else config.WELCOME_BACK_MESSAGE
 
 
 def _report_failure(identity):  # pragma: no cover

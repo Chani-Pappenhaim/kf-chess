@@ -16,6 +16,7 @@ from config import settings
 from events.bus import EventBus
 from game.composition import build_engine, build_registry
 from logs.activity_log import file_log
+from server.api import ApiGateway
 from server.broadcast import subscribe_broadcast
 from server.lobby import Lobby
 from server.matchmaking import Matchmaker
@@ -27,6 +28,7 @@ from server.room import Room
 from server.room_directory import InMemoryRoomDirectory
 from server.service import GameService
 from server.socket import WebSocketServer
+from server.tokens import InMemoryTokenStore
 
 
 def load_board(config):
@@ -52,19 +54,21 @@ def build_room(room_id, config, store):
     return room
 
 
-def build_service(config=settings, store=None):
+def build_service(config=settings, store=None, tokens=None):
     """The server, wired to host many games. Returns the outbox (to drain) and
     the service the socket drives.
 
-    `store` is injectable so a test can pass a fake account store instead of a
-    real database; the server proper opens one from config.
+    `store` and `tokens` are injectable so a test can pass fakes instead of a
+    real database and a real token store; the server proper builds both from
+    config and shares them with the API Gateway (see run()).
     """
     accounts = store or _default_account_store(config)
+    session_tokens = tokens or InMemoryTokenStore()
     outbox = Outbox()
     directory = InMemoryRoomDirectory()
     lobby = Lobby(lambda room_id: build_room(room_id, config, accounts), directory, config.SERVER_ID)
     matchmaker = Matchmaker(lobby, InMemoryMatchmakingQueue(config), config)
-    return outbox, GameService(lobby, matchmaker, accounts, config)
+    return outbox, GameService(lobby, matchmaker, session_tokens, config)
 
 
 def _default_account_store(config):  # pragma: no cover - connects to a real database
@@ -74,7 +78,10 @@ def _default_account_store(config):  # pragma: no cover - connects to a real dat
 
 
 def run(config=settings):  # pragma: no cover - runs until interrupted
-    outbox, service = build_service(config)
+    accounts = _default_account_store(config)
+    tokens = InMemoryTokenStore()
+    ApiGateway(config, accounts, tokens).start()
+    outbox, service = build_service(config, store=accounts, tokens=tokens)
     log = file_log(config.SERVER_LOG_PATH, "kfchess.server")
     try:
         print(f"KungFu Chess server listening on {config.SERVER_URL}")

@@ -14,9 +14,8 @@ def test_a_fresh_identity_knows_nothing_yet():
 
 def test_a_welcome_marks_the_login_accepted():
     identity = Identity()
-    identity.welcome(True)
+    identity.welcome()
     assert identity.logged_in() is True
-    assert identity.new_account() is True
 
 
 def test_a_rejection_records_its_reason():

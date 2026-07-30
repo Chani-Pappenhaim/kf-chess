@@ -43,7 +43,7 @@ class WebSocketServer:  # pragma: no cover - socket shell, exercised by running 
 
         session = None
         try:
-            # The opening line must be a Login. Its replies (a welcome, or a
+            # The opening line must be a Connect. Its replies (a welcome, or a
             # rejection) are awaited straight onto the wire, so a refused client
             # still hears why before the connection closes.
             opening = await connection.recv()

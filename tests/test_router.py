@@ -83,9 +83,8 @@ def test_text_that_is_not_a_message_is_refused():
 
 def test_a_welcome_marks_the_login_accepted():
     _inbox, _bus, identity, router = routed()
-    router.route(encode(Welcome(True)))
+    router.route(encode(Welcome()))
     assert identity.logged_in() is True
-    assert identity.new_account() is True
 
 
 def test_entering_a_room_records_colour_room_and_role():

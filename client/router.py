@@ -2,7 +2,7 @@
 
 The mirror of the server's CommandHandler: which message does what is a lookup,
 not a chain of tests, so a new message is an entry here and a method beside it.
-Login answers and room placement update the identity; a state or a hint goes to
+The welcome and room placement update the identity; a state or a hint goes to
 the inbox; an event is republished on the client's own bus, which is what lets
 sound and animation react to a remote game with no idea that it is one - they are
 the same subscribers, on the same kind of bus.
@@ -52,8 +52,8 @@ class MessageRouter:
             raise ProtocolError(type(message).__name__)
         action(message)
 
-    def _welcome(self, message):
-        self._identity.welcome(message.new_account)
+    def _welcome(self, _message):
+        self._identity.welcome()
 
     def _rejected(self, message):
         self._identity.reject(message.reason)

@@ -113,6 +113,11 @@ SERVER_HOST = os.environ.get("KF_SERVER_HOST", "localhost")
 SERVER_PORT = int(os.environ.get("KF_SERVER_PORT", "8765"))
 SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}"
 
+# The API Gateway: login over plain HTTP, separate from the game socket.
+API_HOST = os.environ.get("KF_API_HOST", "localhost")
+API_PORT = int(os.environ.get("KF_API_PORT", "8766"))
+API_LOGIN_URL = f"http://{API_HOST}:{API_PORT}/login"
+
 # Where the shared state lives once the server runs as more than one instance:
 # presence, the room directory, and the matchmaking queue. Defaults to a local
 # Redis; in compose it points at the redis service by name.
@@ -138,6 +143,7 @@ USERNAME_PROMPT = "username: "
 PASSWORD_PROMPT = "password: "
 SERVER_STOPPED_MESSAGE = "server stopped"
 REJECT_WRONG_PASSWORD = "wrong password"
+REJECT_INVALID_TOKEN = "invalid session"
 REJECT_GAME_FULL = "the game already has two players"
 REJECT_NO_SUCH_ROOM = "no room with that id"
 

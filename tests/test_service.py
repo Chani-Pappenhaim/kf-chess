@@ -1,8 +1,9 @@
 from accounts.store import Account
 from config import settings
-from protocol.messages import Login, MoveRequest, Rejected, Welcome, decode, encode
+from protocol.messages import Connect, MoveRequest, Rejected, Welcome, decode, encode
 from server.__main__ import build_room, build_service
 from server.service import GameService
+from server.tokens import InMemoryTokenStore
 from tests.support import FakeAccountStore
 
 
@@ -19,42 +20,38 @@ class _FakeMember:
         self.color = color
 
 
-def service(store=None):
+def service(store=None, tokens=None):
     """The real server graph, minus the socket and the real database."""
     _outbox, game = build_service(
-        settings, store=store or FakeAccountStore(settings.STARTING_RATING)
+        settings,
+        store=store or FakeAccountStore(settings.STARTING_RATING),
+        tokens=tokens or InMemoryTokenStore(),
     )
     return game
 
 
-def admit(game, username, password="pw"):
-    session, replies = game.admit(encode(Login(username, password)), lambda line: None)
+def admit(game, tokens, account):
+    """As the API Gateway already logged `account` in: issue it a token, then
+    connect with that token."""
+    token = tokens.issue(account)
+    session, replies = game.admit(encode(Connect(token)), lambda line: None)
     return session, [decode(line) for line in replies]
 
 
-def test_a_new_username_is_registered_and_welcomed():
-    session, replies = admit(service(), "dana")
+def test_a_valid_token_is_admitted_and_welcomed():
+    tokens = InMemoryTokenStore()
+    session, replies = admit(service(tokens=tokens), tokens, Account("dana", settings.STARTING_RATING))
     assert session is not None
-    assert replies[0] == Welcome(True)  # a fresh account
+    assert replies[0] == Welcome()
 
 
-def test_a_returning_user_with_the_right_password_is_welcomed_back():
-    store = FakeAccountStore(settings.STARTING_RATING)
-    store.register("dana", "pw")
-    session, replies = admit(service(store), "dana")
-    assert session is not None
-    assert replies[0] == Welcome(False)  # a known account, not new
-
-
-def test_a_returning_user_with_the_wrong_password_is_refused():
-    store = FakeAccountStore(settings.STARTING_RATING)
-    store.register("dana", "secret")
-    session, replies = admit(service(store), "dana", password="wrong")
+def test_an_unknown_token_is_refused():
+    session, replies = service().admit(encode(Connect("nope")), lambda line: None)
     assert session is None
-    assert replies[0] == Rejected(settings.REJECT_WRONG_PASSWORD)
+    assert decode(replies[0]) == Rejected(settings.REJECT_INVALID_TOKEN)
 
 
-def test_an_opening_line_that_is_not_a_login_is_refused():
+def test_an_opening_line_that_is_not_a_connect_is_refused():
     session, replies = service().admit(encode(MoveRequest("WPe2e4")), lambda line: None)
     assert session is None and replies == ()
 

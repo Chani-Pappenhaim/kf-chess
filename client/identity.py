@@ -4,7 +4,7 @@ Written on the socket thread as the server's answers arrive, read on the frame
 loop when a screen needs to know where it stands. Three things live here, none of
 which a client can read off the game state:
 
-- the login result (was the account just created; was the login refused),
+- the login result (was the token accepted; was it refused),
 - the room role (which room, which colour, whether a viewer),
 - the connection (whether it dropped, and why).
 
@@ -21,7 +21,6 @@ class Identity:
     def __init__(self):
         self._lock = threading.Lock()
         self._logged_in = False   # whether the server accepted the login
-        self._new_account = False
         self._rejection = None    # why the login was refused, if it was
         self._color = None        # this client's seat, once in a room
         self._room_id = None      # the room it is in
@@ -32,21 +31,15 @@ class Identity:
 
     # -- login ------------------------------------------------------------
 
-    def welcome(self, new_account):
+    def welcome(self):
         with self._lock:
-            self._new_account = new_account
             self._logged_in = True
 
     def logged_in(self):
-        """Whether the server accepted the login (the cue to leave the connecting
+        """Whether the server accepted the token (the cue to leave the connecting
         screen for the home screen)."""
         with self._lock:
             return self._logged_in
-
-    def new_account(self):
-        """Whether the login just created a fresh account (for the greeting)."""
-        with self._lock:
-            return self._new_account
 
     def reject(self, reason):
         with self._lock:

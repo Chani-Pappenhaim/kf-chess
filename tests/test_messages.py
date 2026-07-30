@@ -6,13 +6,13 @@ from game.events import PieceCaptured
 from protocol.errors import ProtocolError
 from protocol.events import encode_event
 from protocol.messages import (
+    Connect,
     CreateRoom,
     EventNotice,
     HintsReply,
     HintsRequest,
     JoinRoom,
     JumpRequest,
-    Login,
     MESSAGE_TYPES,
     MoveRequest,
     NoOpponent,
@@ -27,14 +27,14 @@ from protocol.messages import (
 from protocol.state import decode_model, encode_model
 
 SAMPLES = (
-    Login("dana", "open sesame"),
+    Connect("a-token"),
     MoveRequest("WQe2e5"),
     JumpRequest("e4"),
     HintsRequest("e2"),
     SeekGame(),
     CreateRoom(),
     JoinRoom("7"),
-    Welcome(True),
+    Welcome(),
     Rejected("full"),
     RoomEntered("w", "7", False),
     NoOpponent(),

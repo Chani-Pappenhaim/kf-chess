@@ -6,9 +6,12 @@ services:
     build: .
     ports:
       - "8765:8765"          # host 8765 -> container 8765, so a host client connects
+      - "8766:8766"          # the API Gateway's login endpoint
     environment:
       KF_SERVER_HOST: "0.0.0.0"   # bind every interface so the port mapping is reachable
       KF_SERVER_PORT: "8765"
+      KF_API_HOST: "0.0.0.0"
+      KF_API_PORT: "8766"
       KF_REDIS_URL: "redis://redis:6379"   # reach the redis service below by name
       KF_DATABASE_URL: "postgresql://kfchess:kfchess@postgres:5432/kfchess"
     depends_on:
