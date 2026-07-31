@@ -78,10 +78,16 @@ def run(config=settings, ask=input, ask_secret=read_password, login=http_login):
                 _report_failure(identity)
                 return
             join_room_id = identity.redirect_room_id()
-            if join_room_id is None:  # entered a room here - no redirect pending
-                break
-        _play(window, gateway, inbox, bus, identity, config)
-        _report_failure(identity)
+            if join_room_id is not None:  # matched elsewhere - reconnect straight there
+                continue
+            _play(window, gateway, inbox, bus, identity, config)
+            if not identity.lost():
+                return  # the window closed - nothing left to reconnect to
+            # The connection dropped mid-game (e.g. the game server crashed). A
+            # 30-90s game is cheap to lose - back to the home screen for a fresh
+            # Play, not an attempt to rebuild the live board (see
+            # docs/scale-architecture.md's "resign/refund and re-queue" call).
+            print(identity.loss_reason())
     finally:
         window.close()
 
