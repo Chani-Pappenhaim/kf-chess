@@ -29,6 +29,17 @@ def plan_route(message, first, allocator):
     return None, first
 
 
+def room_missing(line, reject_reason):
+    """Whether `line` is a Rejected(no-such-room) reply - the signal that
+    hash(room_id) named a server that doesn't actually hold the room, not
+    that the room is genuinely gone. Happens when the ring's membership
+    changed (a shard died or joined) since the room opened: the hash is a
+    pure function of the *current* pool, so it can point somewhere stale for
+    a room minted under an earlier pool."""
+    message = decode(line)
+    return isinstance(message, Rejected) and message.reason == reject_reason
+
+
 class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running it
     def __init__(self, config, pool):
         self._config = config
@@ -56,7 +67,10 @@ class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running
             upstream, first = await self._route(client_ws, upstream, address, opening)
             if first is None:
                 return
-            await upstream.send(first)
+            upstream, response = await self._join(upstream, opening, first)
+            await client_ws.send(response)
+            if isinstance(decode(response), Rejected):
+                return
             await self._relay(client_ws, upstream)
         finally:
             await upstream.close()
@@ -77,6 +91,30 @@ class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running
                 await upstream.send(opening)
                 await upstream.recv()  # the Welcome, already sent to the client once
         return upstream, first
+
+    async def _join(self, upstream, opening, first):
+        """Send `first` and read the reply. A "no such room" from the hashed
+        target may just mean the hash is stale (the pool changed since the
+        room opened, see room_missing) - try every other pool member before
+        believing the room is actually gone. Rare and only ever transient
+        (right after a scale event), so a linear scan over the pool is cheap
+        enough; the hot path (the hash is right, as it almost always is)
+        costs nothing extra."""
+        await upstream.send(first)
+        response = await upstream.recv()
+        if not room_missing(response, self._config.REJECT_NO_SUCH_ROOM):
+            return upstream, response
+        for address in self._pool.values():
+            candidate = await connect_upstream(address)
+            await candidate.send(opening)
+            await candidate.recv()  # the Welcome
+            await candidate.send(first)
+            candidate_response = await candidate.recv()
+            if not room_missing(candidate_response, self._config.REJECT_NO_SUCH_ROOM):
+                await upstream.close()
+                return candidate, candidate_response
+            await candidate.close()
+        return upstream, response
 
     async def _relay(self, client_ws, upstream):
         async def to_upstream():

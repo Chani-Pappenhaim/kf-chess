@@ -1,6 +1,6 @@
-from protocol.messages import CreateRoom, JoinRoom, SeekGame, decode, encode
+from protocol.messages import CreateRoom, JoinRoom, Rejected, RoomEntered, SeekGame, decode, encode
 from server.allocator import GameAllocator
-from server.ws_gateway import plan_route
+from server.ws_gateway import plan_route, room_missing
 
 
 def test_join_room_hashes_the_room_it_names():
@@ -35,3 +35,18 @@ def test_seek_game_has_no_room_bound_target():
     target, line = plan_route(SeekGame(), first, allocator)
     assert target is None
     assert line == first
+
+
+def test_a_no_such_room_rejection_is_recognised_as_room_missing():
+    line = encode(Rejected("no room with that id"))
+    assert room_missing(line, "no room with that id") is True
+
+
+def test_a_different_rejection_reason_is_not_room_missing():
+    line = encode(Rejected("the game already has two players"))
+    assert room_missing(line, "no room with that id") is False
+
+
+def test_a_non_rejection_reply_is_not_room_missing():
+    line = encode(RoomEntered("w", "7", False))
+    assert room_missing(line, "no room with that id") is False
