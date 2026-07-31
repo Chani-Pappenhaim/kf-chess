@@ -1,7 +1,7 @@
 from config import settings
-from server.api import handle_health, handle_login, handle_metrics, handle_metrics_prometheus
+from server.api import handle_health, handle_history, handle_login, handle_metrics, handle_metrics_prometheus
 from server.tokens import InMemoryTokenStore
-from tests.support import FakeAccountStore
+from tests.support import FakeAccountStore, FakeHistoryStore
 
 
 def login(store, tokens, username, password):
@@ -58,3 +58,22 @@ def test_prometheus_metrics_exposes_active_rooms_in_exposition_format():
     assert status == 200
     assert "active_rooms 7" in body
     assert "# TYPE active_rooms gauge" in body
+
+
+def test_history_requires_a_username():
+    status, payload = handle_history(FakeHistoryStore(), None, settings)
+    assert status == 400
+
+
+def test_history_reports_a_players_recent_games():
+    history = FakeHistoryStore()
+    history.record("dana", "yossi", None, 1000)
+    status, payload = handle_history(history, "dana", settings)
+    assert status == 200
+    assert payload["games"] == [{"winner": "dana", "loser": "yossi", "reason": None, "ended_at": 1000}]
+
+
+def test_history_is_empty_for_a_player_with_no_games():
+    status, payload = handle_history(FakeHistoryStore(), "nobody", settings)
+    assert status == 200
+    assert payload["games"] == []

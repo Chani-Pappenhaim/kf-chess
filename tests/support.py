@@ -25,3 +25,17 @@ class FakeAccountStore:
 
     def set_rating(self, username, rating):
         self._accounts[username][1] = rating
+
+
+class FakeHistoryStore:
+    """An in-memory HistoryStore, so server tests need no SQLite file."""
+
+    def __init__(self):
+        self._games = []  # newest first
+
+    def record(self, winner, loser, reason, ended_at):
+        self._games.insert(0, {"winner": winner, "loser": loser, "reason": reason, "ended_at": ended_at})
+
+    def recent(self, username, limit):
+        mine = [g for g in self._games if username in (g["winner"], g["loser"])]
+        return tuple(mine[:limit])

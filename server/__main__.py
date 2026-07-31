@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 
+from accounts.history_store import PostgresHistoryStore, SqliteHistoryStore
 from accounts.postgres_store import PostgresAccountStore
 from accounts.sqlite_store import SqliteAccountStore
 from board.loaders import load_csv_board
@@ -20,6 +21,7 @@ from server.active_rooms import InMemoryActiveRooms, RedisActiveRooms
 from server.allocator import GameAllocator, parse_pool
 from server.api import ApiGateway
 from server.broadcast import subscribe_broadcast
+from server.history import subscribe_history
 from server.lobby import Lobby
 from server.matchmaking import Matchmaker
 from server.matchmaking_queue import InMemoryMatchmakingQueue, RedisMatchmakingQueue
@@ -42,10 +44,10 @@ def load_board(config):
         return load_csv_board(handle.read().splitlines(), registry, config), registry
 
 
-def build_room(room_id, config, store):
+def build_room(room_id, config, store, history):
     """One room's whole graph: a fresh board and engine, a registry to seat its
-    two players, and this room's own broadcaster and rating subscriber on its own
-    bus - so nothing it publishes reaches any other room."""
+    two players, and this room's own broadcaster, rating, and history
+    subscribers on its own bus - so nothing it publishes reaches any other room."""
     board, rule_registry = load_board(config)
     bus = EventBus()
     engine = build_engine(board, rule_registry, config, bus)
@@ -53,27 +55,30 @@ def build_room(room_id, config, store):
     room = Room(room_id, engine, players, board.height, config)
     subscribe_broadcast(bus, room.broadcast)
     subscribe_ratings(bus, players, store, config)
+    subscribe_history(bus, players, history, config)
     return room
 
 
-def build_service(config=settings, store=None, tokens=None, queue=None, bus=None, active_rooms=None):
+def build_service(config=settings, store=None, tokens=None, queue=None, bus=None,
+                   active_rooms=None, history=None):
     """The server, wired to host many games. Returns the outbox (to drain) and
     the service the socket drives.
 
-    `store`, `tokens`, `queue`, `bus`, and `active_rooms` are injectable so a
-    test can pass fakes instead of real infrastructure; the server proper
-    builds them from config and shares them with the API Gateway (see run()).
-    Room placement is computed from GAME_SERVERS, the same pool the WebSocket
-    Gateway routes by - a single entry (the default) always resolves to this
-    one server.
+    `store`, `tokens`, `queue`, `bus`, `active_rooms`, and `history` are
+    injectable so a test can pass fakes instead of real infrastructure; the
+    server proper builds them from config and shares them with the API
+    Gateway (see run()). Room placement is computed from GAME_SERVERS, the
+    same pool the WebSocket Gateway routes by - a single entry (the default)
+    always resolves to this one server.
     """
     accounts = store or _default_account_store(config)
+    game_history = history or _default_history_store(config)
     session_tokens = tokens or InMemoryTokenStore()
     matchmaking_queue = queue or InMemoryMatchmakingQueue(config)
     allocator = GameAllocator(parse_pool(config.GAME_SERVERS).keys())
     outbox = Outbox()
     lobby = Lobby(
-        lambda room_id: build_room(room_id, config, accounts), config.SERVER_ID,
+        lambda room_id: build_room(room_id, config, accounts, game_history), config.SERVER_ID,
         active_rooms or InMemoryActiveRooms(),
     )
     matchmaker = Matchmaker(lobby, matchmaking_queue, config, allocator, config.SERVER_ID, bus)
@@ -86,8 +91,15 @@ def _default_account_store(config):  # pragma: no cover - connects to a real dat
     return SqliteAccountStore(config.ACCOUNTS_DB, config.STARTING_RATING)
 
 
+def _default_history_store(config):  # pragma: no cover - connects to a real database
+    if config.DATABASE_URL:
+        return PostgresHistoryStore(config.DATABASE_URL)
+    return SqliteHistoryStore(config.HISTORY_DB)
+
+
 def run(config=settings):  # pragma: no cover - runs until interrupted
     accounts = _default_account_store(config)
+    history = _default_history_store(config)
     # Distributed: tokens, the matchmaking queue, and the redirect bus move to
     # Redis, shared with the other Game Servers and the Gateway routing them.
     if config.DISTRIBUTED:
@@ -101,9 +113,10 @@ def run(config=settings):  # pragma: no cover - runs until interrupted
         bus = None
         active_rooms = None
     outbox, service = build_service(
-        config, store=accounts, tokens=tokens, queue=queue, bus=bus, active_rooms=active_rooms,
+        config, store=accounts, tokens=tokens, queue=queue, bus=bus,
+        active_rooms=active_rooms, history=history,
     )
-    ApiGateway(config, accounts, tokens, service).start()
+    ApiGateway(config, accounts, tokens, service, history).start()
     log = file_log(config.SERVER_LOG_PATH, "kfchess.server")
     try:
         print(f"KungFu Chess server listening on {config.SERVER_URL}")

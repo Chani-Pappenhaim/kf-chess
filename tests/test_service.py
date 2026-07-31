@@ -4,7 +4,7 @@ from protocol.messages import Connect, MoveRequest, Rejected, Welcome, decode, e
 from server.__main__ import build_room, build_service
 from server.service import GameService
 from server.tokens import InMemoryTokenStore
-from tests.support import FakeAccountStore
+from tests.support import FakeAccountStore, FakeHistoryStore
 
 
 class _FakeMember:
@@ -26,6 +26,7 @@ def service(store=None, tokens=None):
         settings,
         store=store or FakeAccountStore(settings.STARTING_RATING),
         tokens=tokens or InMemoryTokenStore(),
+        history=FakeHistoryStore(),
     )
     return game
 
@@ -64,7 +65,7 @@ def test_an_unreadable_opening_line_is_refused():
 def test_the_factory_opens_a_real_room_that_loads_a_board_and_seats_two():
     # Exercises build_room end to end: a fresh board, engine, and registry, so
     # the first joiner is White and the second Black on a real game.
-    room = build_room("1", settings, FakeAccountStore(settings.STARTING_RATING))
+    room = build_room("1", settings, FakeAccountStore(settings.STARTING_RATING), FakeHistoryStore())
     white, black = _FakeMember("dana"), _FakeMember("yossi")
     room.join(white)
     room.join(black)

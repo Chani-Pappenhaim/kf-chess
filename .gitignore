@@ -40,8 +40,9 @@ Thumbs.db
 slice_sprites.py
 remove_background.py
 
-# Local SQLite accounts database
+# Local SQLite databases
 accounts.db
+history.db
 
 # Runtime activity logs (server/client)
 *.log

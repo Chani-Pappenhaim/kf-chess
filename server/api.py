@@ -10,6 +10,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs
 
 from server.auth import account_for
 
@@ -38,6 +39,15 @@ def handle_metrics(service):
     }
 
 
+def handle_history(history, username, config):
+    """The decision behind GET /history?username=: (status, payload). No I/O
+    of its own beyond the injected store, so it is tested without a port."""
+    if not username:
+        return 400, {"reason": "username is required"}
+    games = history.recent(username, config.HISTORY_LIMIT)
+    return 200, {"games": list(games)}
+
+
 def handle_metrics_prometheus(service):
     """The same active_rooms count, in Prometheus's own exposition format -
     what a real scraper reads, not JSON. This is the endpoint the HPA's
@@ -52,15 +62,16 @@ def handle_metrics_prometheus(service):
 
 
 class ApiGateway:  # pragma: no cover - http shell, exercised by running it
-    def __init__(self, config, store, tokens, service):
+    def __init__(self, config, store, tokens, service, history):
         self._config = config
         self._store = store
         self._tokens = tokens
         self._service = service
+        self._history = history
 
     def start(self):
-        """Serve /login, /health, /metrics on a background thread; the game
-        socket runs the rest.
+        """Serve /login, /health, /metrics, /history on a background thread;
+        the game socket runs the rest.
 
         Accepting a connection is cheap, but a login does real CPU work
         (pbkdf2) - so ThreadingHTTPServer's one-thread-per-connection stays for
@@ -71,20 +82,26 @@ class ApiGateway:  # pragma: no cover - http shell, exercised by running it
         context-switching, not throughput, once every core is already busy.
         """
         hashing = ThreadPoolExecutor(max_workers=os.cpu_count())
-        handler = _handler_for(self._store, self._tokens, self._service, self._config, hashing)
+        handler = _handler_for(
+            self._store, self._tokens, self._service, self._history, self._config, hashing,
+        )
         httpd = ThreadingHTTPServer((self._config.API_HOST, self._config.API_PORT), handler)
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
 
-def _handler_for(store, tokens, service, config, hashing):  # pragma: no cover - http shell
+def _handler_for(store, tokens, service, history, config, hashing):  # pragma: no cover - http shell
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            if self.path == "/health":
+            path, _, query = self.path.partition("?")
+            if path == "/health":
                 self._reply(*handle_health())
-            elif self.path == "/metrics":
+            elif path == "/metrics":
                 self._reply(*handle_metrics(service))
-            elif self.path == "/metrics/prometheus":
+            elif path == "/metrics/prometheus":
                 self._reply_text(*handle_metrics_prometheus(service))
+            elif path == "/history":
+                username = parse_qs(query).get("username", [None])[0]
+                self._reply(*handle_history(history, username, config))
             else:
                 self._reply(404, {"reason": "not found"})
 

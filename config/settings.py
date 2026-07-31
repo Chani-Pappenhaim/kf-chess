@@ -188,6 +188,15 @@ ACCOUNTS_DB = os.environ.get("KF_ACCOUNTS_DB", os.path.join(_PROJECT_ROOT, "acco
 STARTING_RATING = 1200
 ELO_K_FACTOR = 32
 
+# Finished-game results (accounts/history_store.py). A separate SQLite file so
+# it can be inspected/reset independently of the accounts themselves; the
+# same DATABASE_URL is reused for PostgreSQL, since that's one server holding
+# multiple tables, not a second database to configure.
+HISTORY_DB = os.environ.get("KF_HISTORY_DB", os.path.join(_PROJECT_ROOT, "history.db"))
+
+# How many recent games GET /history?username= returns.
+HISTORY_LIMIT = 20
+
 # Every /login reply (new account, wrong password, or success alike) waits a
 # random extra beat in this range before it is sent - defense in depth against
 # timing analysis beyond what equal-cost pbkdf2 hashing and constant-time
