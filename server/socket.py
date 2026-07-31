@@ -17,8 +17,6 @@ from websockets.exceptions import ConnectionClosed
 
 from protocol.errors import ProtocolError
 
-_MS_PER_SECOND = 1000  # the game counts in milliseconds, asyncio.sleep in seconds
-
 
 class WebSocketServer:  # pragma: no cover - socket shell, exercised by running it
     def __init__(self, config, outbox, service, log):
@@ -73,7 +71,7 @@ class WebSocketServer:  # pragma: no cover - socket shell, exercised by running 
         """Advance the game and flush what it had to say, forever."""
         interval = self._config.SERVER_TICK_MS
         while True:
-            await asyncio.sleep(interval / _MS_PER_SECOND)
+            await asyncio.sleep(interval / self._config.MS_PER_SECOND)
             self._service.tick(interval)
             await self._flush()
 

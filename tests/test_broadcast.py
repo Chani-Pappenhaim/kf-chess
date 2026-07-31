@@ -106,3 +106,13 @@ def test_the_viewers_and_resign_countdown_travel_in_the_state():
     restored = decode_model(decode(sent[0]).state)
     assert restored.viewers == ("chani", "avi")
     assert restored.countdown == 12
+
+
+def test_a_move_history_limit_trims_the_state_that_goes_out():
+    engine = play.build_engine(settings)
+    engine.request_move((6, 0), (4, 0))
+    engine.wait(settings.MOVE_DURATION)
+    sent = []
+    broadcast_state(engine, {}, {}, (), None, sent.append, move_history_limit=0)
+    restored = decode_model(decode(sent[0]).state)
+    assert restored.moves == ()

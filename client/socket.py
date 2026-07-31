@@ -18,7 +18,6 @@ from websockets.exceptions import ConnectionClosed
 
 from protocol.errors import ProtocolError
 
-_MS_PER_SECOND = 1000
 _IDLE_SECONDS = 0.01  # how long the sender naps when there is nothing to send
 
 

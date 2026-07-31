@@ -25,6 +25,23 @@ def test_the_encoded_state_is_plain_json():
     json.dumps(encode_model(moving_game()))
 
 
+def test_a_move_history_limit_keeps_only_the_trailing_records():
+    model = RenderModel(
+        pieces=(), width=8, height=8,
+        moves=tuple(MoveRecord("w", f"e2e{i}", i) for i in range(5)),
+    )
+    encoded = encode_model(model, move_history_limit=2)
+    assert [m["notation"] for m in encoded["moves"]] == ["e2e3", "e2e4"]
+
+
+def test_no_limit_keeps_the_whole_move_history():
+    model = RenderModel(
+        pieces=(), width=8, height=8,
+        moves=tuple(MoveRecord("w", f"e2e{i}", i) for i in range(5)),
+    )
+    assert len(encode_model(model)["moves"]) == 5
+
+
 def test_cells_come_back_as_tuples():
     # A list would compare unequal to every cell in the rest of the code, and
     # could not be used as a key at all.

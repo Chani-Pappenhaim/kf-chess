@@ -29,7 +29,7 @@ def subscribe_broadcast(bus, send):
         bus.subscribe(event_type, relay)
 
 
-def broadcast_state(engine, players, ratings, viewers, countdown, send):
+def broadcast_state(engine, players, ratings, viewers, countdown, send, move_history_limit=None):
     """Send the whole state as it stands right now.
 
     Player names, ratings, who is watching, and any resign countdown are the
@@ -37,10 +37,11 @@ def broadcast_state(engine, players, ratings, viewers, countdown, send):
     boundary rather than inside a game that has no notion of players. Whole
     state, not the difference from last time: a client that misses one is
     corrected by the next, and one just connected needs no catching up beyond a
-    single line.
+    single line. `move_history_limit` keeps that whole-state guarantee cheap by
+    bounding the one field that would otherwise grow every tick.
     """
     model = replace(
         engine.render_model(),
         players=players, ratings=ratings, viewers=viewers, countdown=countdown,
     )
-    send(encode(StateUpdate(encode_model(model))))
+    send(encode(StateUpdate(encode_model(model, move_history_limit))))

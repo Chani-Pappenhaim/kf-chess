@@ -149,6 +149,14 @@ GAME_SERVERS = os.environ.get("KF_GAME_SERVERS", "local=ws://localhost:8765")
 # draw what they are sent and never advance anything themselves.
 SERVER_TICK_MS = 33
 
+MS_PER_SECOND = 1000  # the game counts in milliseconds, asyncio.sleep in seconds
+
+# How many trailing move records a StateUpdate carries. Without a cap this
+# field alone would grow every tick for as long as the game runs, dwarfing the
+# rest of the message; the move table only ever shows the tail anyway, and
+# each move a client already saw arrives once more as its own EventNotice.
+STATE_MOVE_HISTORY_LIMIT = 40
+
 # Shown in the client's window until the server sends the first state.
 CONNECTING_TEXT = "connecting..."
 

@@ -13,15 +13,26 @@ from game.move_log import MoveRecord
 from view.render_model import RenderModel, RenderPiece
 
 
-def encode_model(model):
-    """A RenderModel as plain data."""
+def encode_model(model, move_history_limit=None):
+    """A RenderModel as plain data.
+
+    `move_history_limit` bounds how many trailing move records are sent, so a
+    state that goes out every tick does not re-send the whole game's move log
+    every time - only the network encoding trims it; a local RenderModel keeps
+    every move, as scoring and rating need the full log regardless.
+    """
+    if move_history_limit is None:
+        moves = model.moves
+    else:
+        # -0 slices as the whole list, not nothing, so 0 needs its own branch.
+        moves = model.moves[-move_history_limit:] if move_history_limit > 0 else ()
     return {
         "pieces": [_encode_piece(piece) for piece in model.pieces],
         "width": model.width,
         "height": model.height,
         "game_over": model.game_over,
         "clock": model.clock,
-        "moves": [_encode_move(record) for record in model.moves],
+        "moves": [_encode_move(record) for record in moves],
         "scores": dict(model.scores),
         "players": dict(model.players),
         "ratings": dict(model.ratings),

@@ -127,4 +127,5 @@ class Room:
         broadcast_state(
             self._engine, self._registry.names(), self._registry.ratings(),
             self._viewer_names(), self._countdown_seconds(), self.broadcast,
+            self._config.STATE_MOVE_HISTORY_LIMIT,
         )

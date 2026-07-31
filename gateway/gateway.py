@@ -2,10 +2,8 @@
 
 A contract only (no logic): the UI depends on this Protocol, never on the
 concrete GameEngine, so the single copy of the game logic can be reached
-in-process today and over a network later. GameEngine already exposes exactly
-these methods, so it satisfies the contract with no wrapper class. A future
-NetworkGateway will implement the same methods over the wire, forwarding to an
-engine running on a server - see NetworkGateway below.
+in-process (GameEngine) or over a network (client.gateway.NetworkGateway)
+with no UI code change.
 
 Commands are sent, not asked: they report nothing back, because a remote one
 could not answer in time to be useful. Everything the UI learns, it learns from
@@ -36,21 +34,3 @@ class GameGateway(Protocol):
 
     def render_model(self) -> RenderModel:
         ...
-
-
-class NetworkGateway:
-    """Planned remote implementation of GameGateway (not yet built).
-
-    Documented here to make the extension point explicit: a remote proxy that
-    serialises each command to a server running the authoritative GameEngine,
-    and answers every query from the last state that server sent back. The
-    server alone advances time - a networked client is wired with no clock step -
-    so every client just draws the state it is given. No UI code changes when
-    this replaces the local engine.
-    """
-
-    def __init__(self, *args, **kwargs):
-        raise NotImplementedError(
-            "NetworkGateway is a planned extension; use a GameEngine "
-            "(the in-process GameGateway) for now."
-        )
