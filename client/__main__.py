@@ -75,6 +75,13 @@ def run(config=settings, ask=input, ask_secret=read_password, login=http_login):
                 else _pick_and_enter(window, socket.send, identity, config)
             )
             if not entered:
+                if join_room_id is not None:
+                    # Whatever we tried to reconnect to (a match on another
+                    # server, or resuming after a drop below) is genuinely
+                    # unreachable - fall back to the home screen instead of
+                    # exiting, the same as any other dead end.
+                    join_room_id = None
+                    continue
                 _report_failure(identity)
                 return
             join_room_id = identity.redirect_room_id()
@@ -83,11 +90,12 @@ def run(config=settings, ask=input, ask_secret=read_password, login=http_login):
             _play(window, gateway, inbox, bus, identity, config)
             if not identity.lost():
                 return  # the window closed - nothing left to reconnect to
-            # The connection dropped mid-game (e.g. the game server crashed). A
-            # 30-90s game is cheap to lose - back to the home screen for a fresh
-            # Play, not an attempt to rebuild the live board (see
-            # docs/scale-architecture.md's "resign/refund and re-queue" call).
-            print(identity.loss_reason())
+            # The connection dropped mid-game (e.g. the game server crashed).
+            # Try to resume the same room first - the game-server may have
+            # rehydrated it from a saved snapshot (server/room_snapshots.py);
+            # if that reconnect itself fails, the branch above falls back to
+            # the home screen rather than exiting.
+            join_room_id = identity.room_id()
     finally:
         window.close()
 

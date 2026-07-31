@@ -14,6 +14,13 @@ leaver's name - long enough that a blink of a connection is not a lost game.
 
 Time is handed in through tick(dt); the room counts the grace period from it, so
 the server clock stays the only clock here too.
+
+`snapshots`, when given, mirrors the live position to Redis every
+ROOM_SNAPSHOT_INTERVAL_MS - board occupancy and seats only, not per-piece
+cooldowns or an in-flight move's exact progress - so if the process holding
+this room dies, `Lobby.room()` can rehydrate it instead of losing the game
+outright. See server/__main__.py::build_room for what a rehydrated room
+restores.
 """
 from __future__ import annotations
 
@@ -22,12 +29,14 @@ from server.broadcast import broadcast_state
 
 
 class Room:
-    def __init__(self, room_id, engine, registry, board_height, config):
+    def __init__(self, room_id, engine, registry, board_height, config, snapshots=None):
         self._id = room_id
         self._engine = engine
         self._registry = registry
         self._height = board_height
         self._config = config
+        self._snapshots = snapshots
+        self._since_snapshot = 0
         self._members = []          # ClientSessions in this room
         self._started = False       # whether both seats filled and the game began
         self._countdown = None      # ms left before a disconnected player resigns
@@ -59,6 +68,8 @@ class Room:
         if color is not None and self._both_seats_filled() and not self._started:
             self._engine.start()
             self._started = True
+            self._save_snapshot()  # something to rehydrate from even if a
+                                    # crash lands inside the first interval
         self._broadcast_state()
 
     def leave(self, session):
@@ -84,12 +95,18 @@ class Room:
             member.send(line)
 
     def tick(self, dt):
-        """Advance this room's game, run any resign countdown, send the state."""
+        """Advance this room's game, run any resign countdown, mirror the
+        position if it's been long enough, send the state."""
         self._engine.wait(dt)
         if self._countdown is not None:
             self._countdown -= dt
             if self._countdown <= 0:
                 self._resign()
+        if self._snapshots is not None:
+            self._since_snapshot += dt
+            if self._since_snapshot >= self._config.ROOM_SNAPSHOT_INTERVAL_MS:
+                self._since_snapshot = 0
+                self._save_snapshot()
         self._broadcast_state()
 
     def _resign(self):
@@ -122,6 +139,25 @@ class Room:
         if self._countdown is None:
             return None
         return max(0, -(-self._countdown // 1000))
+
+    def _save_snapshot(self):
+        if self._snapshots is not None:
+            self._snapshots.save(self._id, self.snapshot())
+
+    def snapshot(self):
+        """This room's position and seats, in the shape build_room's
+        `restore` param expects."""
+        model = self._engine.render_model()
+        names = self._registry.names()
+        ratings = self._registry.ratings()
+        return {
+            "pieces": [[piece.token, list(piece.cell)] for piece in model.pieces],
+            "width": model.width,
+            "height": model.height,
+            "players": {
+                color: {"username": names[color], "rating": ratings[color]} for color in names
+            },
+        }
 
     def _broadcast_state(self):
         broadcast_state(

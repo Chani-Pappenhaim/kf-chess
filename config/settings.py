@@ -197,6 +197,14 @@ HISTORY_DB = os.environ.get("KF_HISTORY_DB", os.path.join(_PROJECT_ROOT, "histor
 # How many recent games GET /history?username= returns.
 HISTORY_LIMIT = 20
 
+# How often a room's live position is mirrored to Redis (server/room_snapshots.py),
+# so a room can be rehydrated - board position and seats only, not exact
+# per-piece cooldown/in-flight timing - if the game-server process holding it
+# crashes. Every tick would work too but multiplies Redis writes ~30x for no
+# real benefit at this game's length; once a second is enough to make a crash
+# cost seconds of position, not the whole game.
+ROOM_SNAPSHOT_INTERVAL_MS = 1000
+
 # Every /login reply (new account, wrong password, or success alike) waits a
 # random extra beat in this range before it is sent - defense in depth against
 # timing analysis beyond what equal-cost pbkdf2 hashing and constant-time

@@ -96,3 +96,16 @@ def test_seated_color_finds_a_still_seated_player():
 def test_seated_color_is_none_for_an_empty_seat():
     registry = PlayerRegistry(COLORS)
     assert registry.seated_color("dana") is None
+
+
+def test_restore_seats_both_colours_directly_from_a_snapshot():
+    registry = PlayerRegistry(COLORS)
+    registry.restore({"w": {"username": "dana", "rating": 1300}, "b": {"username": "yossi", "rating": 1100}})
+    assert registry.names() == {"w": "dana", "b": "yossi"}
+    assert registry.ratings() == {"w": 1300, "b": 1100}
+
+
+def test_a_restored_player_is_recognised_on_reconnect():
+    registry = PlayerRegistry(COLORS)
+    registry.restore({"w": {"username": "dana", "rating": 1200}})
+    assert registry.seated_color("dana") == "w"

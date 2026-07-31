@@ -267,17 +267,29 @@ to the owning game-server for the life of the (short) game. Stickiness is at the
   **message bus**, so spectators, the persistence worker, and presence all learn
   about them without the game-server knowing their addresses - the same
   publish/subscribe decoupling the repo already uses in-process.
-- **Reconnecting mid-game.** Within the *same* game-server process, a dropped
-  socket does not lose the seat: the room keeps counting down a resign grace
-  period, and a session that reconnects with the same account is recognised and
-  reseated in its own colour (`PlayerRegistry.seated_color`), not turned into a
-  viewer. If the *process itself* dies mid-game, its rooms' live state (board,
-  clock, in-flight moves) dies with it - deliberately not mirrored to Redis on
-  every tick. For a 30-90s game the cost of doing that (serialising the whole
-  board+arbiter+cooldown state on every move, for a failure mode that only
-  matters for a handful of seconds of a short game) outweighs the benefit; the
-  client instead returns its player to the home screen to re-queue for a fresh
-  match, the same "resign/refund and re-queue" call made below in Part 4.
+- **Reconnecting mid-game, including after a crash.** Within the *same*
+  game-server process, a dropped socket does not lose the seat: the room keeps
+  counting down a resign grace period, and a session that reconnects with the
+  same account is recognised and reseated in its own colour
+  (`PlayerRegistry.seated_color`), not turned into a viewer. If the *process
+  itself* dies mid-game, its rooms' exact live state (per-piece cooldowns, an
+  in-flight move's precise progress) still dies with it - that part of "full
+  fidelity" genuinely is not mirrored on every tick, since serialising the
+  whole board+arbiter+cooldown state that often for a failure mode that only
+  matters for a few seconds of a short game was judged not worth the cost.
+  What *is* mirrored (`server/room_snapshots.py`, once a second, plus once
+  immediately when the game starts): board occupancy and who is seated where.
+  `Lobby.room()` rehydrates a room from its last snapshot on a miss - a fresh
+  `GameEngine` seeded with the saved piece positions (`board/loaders.py::load_snapshot_board`),
+  each piece landing idle (no restored cooldown), both seats pre-filled from
+  the saved usernames/ratings so the *same* reconnect-recognition above seats
+  a returning player correctly. Verified against a real crash: two players
+  mid-game, a move landed, the server process killed with `SIGTERM` (not a
+  graceful shutdown), a fresh process started, and a reconnecting client
+  resumed with the moved piece at its post-move square and the correct seat -
+  not the opening position. A client that can't resume the exact room it was
+  in falls back to the home screen to re-queue, the "resign/refund and
+  re-queue" call made below in Part 4 - now the fallback, not the whole story.
 
 ### Which roles split into separate services
 
@@ -417,10 +429,14 @@ the fleet into two populations.
     stop accepting new rooms and wait one game-length.
   - They should be as close to stateless-in-practice as possible: keep only the
     *live* board+clock in RAM, and mirror the minimum needed for reconnect
-    (current board snapshot + room membership) into **Redis**, so if a
-    game-server dies mid-game, a replacement can rehydrate that room from Redis
-    rather than losing it. (Full "hot failover" is optional — for a 45s game you
-    might just resign/refund and re-queue, which is simpler.)
+    (board occupancy + room membership) into **Redis**, so if a game-server dies
+    mid-game, a replacement can rehydrate that room from Redis rather than
+    losing it - implemented (`server/room_snapshots.py`, `Lobby.room()`) and
+    verified against a real killed process (Part 2 above). "Hot failover" full
+    fidelity - per-piece cooldowns, an in-flight move's exact progress -
+    remains deliberately out of scope; a client that can't resume falls back to
+    resign/refund and re-queue, the simpler answer this section originally
+    proposed as the whole story.
 
 - **Auth, matchmaking, presence, persistence, chat, and the databases are
   long-lived.** They don't churn with games; they run continuously and scale on

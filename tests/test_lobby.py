@@ -119,3 +119,55 @@ def test_fleet_room_count_reads_the_registry_not_the_local_map():
     hall.create()
     hall.create()
     assert hall.fleet_room_count() == 2
+
+
+class FakeSnapshots:
+    def __init__(self, saved=None):
+        self.saved = saved or {}
+        self.deleted = []
+
+    def load(self, room_id):
+        return self.saved.get(room_id)
+
+    def delete(self, room_id):
+        self.deleted.append(room_id)
+        self.saved.pop(room_id, None)
+
+
+def test_a_room_missing_locally_is_rehydrated_from_its_snapshot():
+    snapshots = FakeSnapshots({"stale-room": {"pieces": []}})
+    rehydrated = []
+
+    def rehydrate(room_id, snapshot):
+        room = FakeRoom(room_id)
+        rehydrated.append((room_id, snapshot))
+        return room
+
+    hall = Lobby(lambda room_id: FakeRoom(room_id), "test-server", snapshots=snapshots, rehydrate=rehydrate)
+    room = hall.room("stale-room")
+    assert room is not None
+    assert rehydrated == [("stale-room", {"pieces": []})]
+    assert hall.room("stale-room") is room  # cached, not rehydrated twice
+
+
+def test_a_room_with_no_saved_snapshot_is_still_missing():
+    snapshots = FakeSnapshots()
+    hall = Lobby(
+        lambda room_id: FakeRoom(room_id), "test-server",
+        snapshots=snapshots, rehydrate=lambda room_id, snapshot: FakeRoom(room_id),
+    )
+    assert hall.room("never-existed") is None
+
+
+def test_without_snapshots_configured_a_miss_is_just_a_miss():
+    hall, _ = lobby()  # no snapshots/rehydrate given
+    assert hall.room("anything") is None
+
+
+def test_an_emptied_room_has_its_snapshot_deleted_not_just_forgotten():
+    snapshots = FakeSnapshots()
+    hall = Lobby(lambda room_id: FakeRoom(room_id), "test-server", snapshots=snapshots)
+    room = hall.create()
+    room.is_empty = True
+    hall.tick(1)
+    assert snapshots.deleted == [room.id]

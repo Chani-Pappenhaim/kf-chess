@@ -13,11 +13,21 @@ without touching the database.
 """
 from __future__ import annotations
 
+from accounts.store import Account
+
 
 class PlayerRegistry:
     def __init__(self, colors):
         self._colors = tuple(colors)
         self._by_color = {}  # colour -> Account
+
+    def restore(self, players):
+        """Seat every colour in `players` ({colour: {"username", "rating"}})
+        directly, bypassing the one-at-a-time queue `seat()` enforces - used
+        only to rehydrate a room from a saved snapshot, where both seats are
+        already decided and there is no "who arrived first" to preserve."""
+        for color, player in players.items():
+            self._by_color[color] = Account(player["username"], player["rating"])
 
     def seat(self, account):
         """Give `account` the next free colour, or None when both are taken or

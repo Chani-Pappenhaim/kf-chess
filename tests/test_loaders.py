@@ -2,7 +2,7 @@ import pytest
 
 from config import settings
 from board.board import Board
-from board.loaders import load_text_board, load_csv_board, BoardParseError
+from board.loaders import load_text_board, load_csv_board, load_snapshot_board, BoardParseError
 from rules.rule_registry import build_default_registry
 
 
@@ -66,3 +66,15 @@ def test_load_csv_board_rejects_row_width_mismatch(registry):
 def test_load_csv_board_skips_blank_lines(registry):
     board = load_csv_board(["PW,PB", "", "   "], registry, settings)
     assert board.height == 1
+
+
+def test_load_snapshot_board_places_each_piece_at_its_cell(registry):
+    board = load_snapshot_board([("wK", (0, 0)), ("bK", (0, 2))], 3, 1, registry, settings)
+    assert board.get(0, 0) == "wK"
+    assert board.is_empty(0, 1)
+    assert board.get(0, 2) == "bK"
+
+
+def test_load_snapshot_board_rejects_unknown_token(registry):
+    with pytest.raises(BoardParseError):
+        load_snapshot_board([("wX", (0, 0))], 1, 1, registry, settings)

@@ -77,6 +77,21 @@ def load_csv_board(rows, registry, config):
     )
 
 
+def load_snapshot_board(pieces, width, height, registry, config):
+    """Adapter that rebuilds a Board from a list of (token, cell) pairs - the
+    occupancy half of a RenderModel, used to rehydrate a room whose
+    game-server process died (see server/room_snapshots.py). Every piece
+    lands idle at its saved cell; nothing here restores a cooldown or an
+    in-flight move's progress, only where a piece is."""
+    valid_tokens = _valid_text_tokens(registry, config.COLORS, config.EMPTY_CELL)
+    grid = [[config.EMPTY_CELL] * width for _ in range(height)]
+    for token, (row, col) in pieces:
+        if token not in valid_tokens:
+            raise BoardParseError("UNKNOWN_TOKEN")
+        grid[row][col] = token
+    return Board(grid, empty_token=config.EMPTY_CELL)
+
+
 def load_text_board(rows, registry, config):
     """Adapter that converts text board rows into the internal Board.
 

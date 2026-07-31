@@ -72,6 +72,27 @@ def test_the_factory_opens_a_real_room_that_loads_a_board_and_seats_two():
     assert (white.color, black.color) == ("w", "b")
 
 
+def test_the_factory_rehydrates_a_real_room_from_a_saved_snapshot():
+    # Exercises the rehydration path end to end: a real board built from
+    # saved piece positions, not the CSV starting layout, with both seats
+    # already filled from the snapshot rather than by a fresh join().
+    snapshot = {
+        "pieces": [["wK", [7, 4]], ["bK", [0, 4]]],
+        "width": 8, "height": 8,
+        "players": {
+            "w": {"username": "dana", "rating": 1300},
+            "b": {"username": "yossi", "rating": 1100},
+        },
+    }
+    room = build_room(
+        "1", settings, FakeAccountStore(settings.STARTING_RATING), FakeHistoryStore(),
+        snapshot=snapshot,
+    )
+    reconnected = _FakeMember("dana")
+    room.join(reconnected)
+    assert reconnected.color == "w"  # recognised from the restored registry, not seated fresh
+
+
 # -- the coordinator's own duties, over fakes -------------------------------
 
 class _FakeLobby:

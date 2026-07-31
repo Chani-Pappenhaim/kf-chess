@@ -4,7 +4,7 @@ from protocol.messages import RoomEntered, decode
 from protocol.state import decode_model
 from server.registry import PlayerRegistry
 from server.room import Room
-from view.render_model import RenderModel
+from view.render_model import RenderModel, RenderPiece
 
 
 class FakeEngine:
@@ -193,3 +193,68 @@ def test_a_reconnecting_player_is_not_told_they_are_a_spectator():
     r.join(reconnected)
     entered = replies(reconnected)[0]
     assert (entered.color, entered.spectator) == ("b", False)
+
+
+class FakeSnapshots:
+    def __init__(self):
+        self.saved = {}
+
+    def save(self, room_id, snapshot):
+        self.saved[room_id] = snapshot
+
+    def load(self, room_id):
+        return self.saved.get(room_id)
+
+    def delete(self, room_id):
+        self.saved.pop(room_id, None)
+
+
+class FakePieceEngine(FakeEngine):
+    """A FakeEngine whose render_model carries one piece, for snapshot tests."""
+
+    def render_model(self):
+        return RenderModel(pieces=(RenderPiece("wK", (0, 0)),), width=8, height=8)
+
+
+def room_with_snapshots():
+    engine = FakePieceEngine()
+    snapshots = FakeSnapshots()
+    return Room("7", engine, PlayerRegistry(settings.COLORS), 8, settings, snapshots), engine, snapshots
+
+
+def test_the_game_starting_saves_an_immediate_snapshot():
+    r, _engine, snapshots = room_with_snapshots()
+    r.join(FakeSession("dana"))
+    assert "7" not in snapshots.saved   # one player: no game yet
+    r.join(FakeSession("yossi"))
+    assert "7" in snapshots.saved
+
+
+def test_a_snapshot_carries_piece_positions_and_seats():
+    r, _engine, snapshots = room_with_snapshots()
+    r.join(FakeSession("dana", 1300))
+    r.join(FakeSession("yossi", 1100))
+    snapshot = snapshots.saved["7"]
+    assert snapshot["pieces"] == [["wK", [0, 0]]]
+    assert snapshot["players"] == {
+        "w": {"username": "dana", "rating": 1300},
+        "b": {"username": "yossi", "rating": 1100},
+    }
+
+
+def test_the_snapshot_refreshes_on_the_configured_interval_not_every_tick():
+    r, _engine, snapshots = room_with_snapshots()
+    r.join(FakeSession("dana"))
+    r.join(FakeSession("yossi"))
+    snapshots.saved.clear()  # drop the join-time snapshot to isolate tick()
+    r.tick(settings.ROOM_SNAPSHOT_INTERVAL_MS - 1)
+    assert "7" not in snapshots.saved
+    r.tick(1)
+    assert "7" in snapshots.saved
+
+
+def test_no_snapshots_configured_is_a_quiet_no_op():
+    r, _engine = room()  # the plain factory passes no snapshots store
+    r.join(FakeSession("dana"))
+    r.join(FakeSession("yossi"))
+    r.tick(settings.ROOM_SNAPSHOT_INTERVAL_MS)  # must not raise
