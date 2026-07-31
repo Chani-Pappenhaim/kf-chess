@@ -11,6 +11,7 @@ means is a setting, not a number buried here.
 from __future__ import annotations
 
 import sqlite3
+import threading
 
 from accounts.passwords import hash_password, verify
 from accounts.store import Account
@@ -27,32 +28,40 @@ CREATE TABLE IF NOT EXISTS accounts (
 class SqliteAccountStore:
     def __init__(self, path, starting_rating):
         # `path` may be ":memory:" for a throwaway database, which is what the
-        # tests use. check_same_thread is off because the socket thread and the
-        # game share one store; access is serialised by the single event loop.
+        # tests use. check_same_thread is off, and access is guarded by a lock
+        # instead: the game socket's own event loop is single-threaded, but
+        # /login is served by ThreadingHTTPServer - a fresh thread per request -
+        # so this one connection is genuinely shared across concurrent callers.
         self._db = sqlite3.connect(path, check_same_thread=False)
+        self._lock = threading.Lock()
         self._starting_rating = starting_rating
-        self._db.execute(_SCHEMA)
-        self._db.commit()
+        with self._lock:
+            self._db.execute(_SCHEMA)
+            self._db.commit()
 
     def exists(self, username):
-        row = self._db.execute(
-            "SELECT 1 FROM accounts WHERE username = ?", (username,)
-        ).fetchone()
+        with self._lock:
+            row = self._db.execute(
+                "SELECT 1 FROM accounts WHERE username = ?", (username,)
+            ).fetchone()
         return row is not None
 
     def register(self, username, password):
-        self._db.execute(
-            "INSERT INTO accounts (username, password_hash, rating) VALUES (?, ?, ?)",
-            (username, hash_password(password), self._starting_rating),
-        )
-        self._db.commit()
+        password_hash = hash_password(password)  # slow by design; kept off the lock
+        with self._lock:
+            self._db.execute(
+                "INSERT INTO accounts (username, password_hash, rating) VALUES (?, ?, ?)",
+                (username, password_hash, self._starting_rating),
+            )
+            self._db.commit()
         return Account(username, self._starting_rating)
 
     def authenticate(self, username, password):
-        row = self._db.execute(
-            "SELECT password_hash, rating FROM accounts WHERE username = ?",
-            (username,),
-        ).fetchone()
+        with self._lock:
+            row = self._db.execute(
+                "SELECT password_hash, rating FROM accounts WHERE username = ?",
+                (username,),
+            ).fetchone()
         if row is None:
             return None
         password_hash, rating = row
@@ -61,7 +70,8 @@ class SqliteAccountStore:
         return Account(username, rating)
 
     def set_rating(self, username, rating):
-        self._db.execute(
-            "UPDATE accounts SET rating = ? WHERE username = ?", (rating, username)
-        )
-        self._db.commit()
+        with self._lock:
+            self._db.execute(
+                "UPDATE accounts SET rating = ? WHERE username = ?", (rating, username)
+            )
+            self._db.commit()

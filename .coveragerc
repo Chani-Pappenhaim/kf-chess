@@ -10,6 +10,9 @@ omit =
     # Vendored third-party graphics primitive (from KamaTechOrg/CTD26); not our
     # code to unit-test. The window/loop GUI shells use `pragma: no cover`.
     graphics/img.py
+    # An ops tool run by hand against a live server, not exercised by pytest -
+    # same reasoning as the GUI/socket shells, just outside the package tree.
+    scripts/*
 
 [report]
 show_missing = True
