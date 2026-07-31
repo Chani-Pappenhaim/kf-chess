@@ -38,6 +38,19 @@ def handle_metrics(service):
     }
 
 
+def handle_metrics_prometheus(service):
+    """The same active_rooms count, in Prometheus's own exposition format -
+    what a real scraper reads, not JSON. This is the endpoint the HPA's
+    custom `active_rooms` metric (see k8s/game-server.yaml) is only usable if
+    something actually scrapes (see k8s/prometheus-adapter.yaml)."""
+    body = (
+        "# HELP active_rooms Live rooms on this game server.\n"
+        "# TYPE active_rooms gauge\n"
+        f"active_rooms {service.active_rooms()}\n"
+    )
+    return 200, body
+
+
 class ApiGateway:  # pragma: no cover - http shell, exercised by running it
     def __init__(self, config, store, tokens, service):
         self._config = config
@@ -70,6 +83,8 @@ def _handler_for(store, tokens, service, config, hashing):  # pragma: no cover -
                 self._reply(*handle_health())
             elif self.path == "/metrics":
                 self._reply(*handle_metrics(service))
+            elif self.path == "/metrics/prometheus":
+                self._reply_text(*handle_metrics_prometheus(service))
             else:
                 self._reply(404, {"reason": "not found"})
 
@@ -87,6 +102,14 @@ def _handler_for(store, tokens, service, config, hashing):  # pragma: no cover -
             data = json.dumps(payload).encode("utf-8")
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def _reply_text(self, status, body):
+            data = body.encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "text/plain; version=0.0.4")
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)

@@ -1,0 +1,183 @@
+# What actually makes game-server.yaml's HPA (custom metric `active_rooms`,
+# type Pods) do anything. Two pieces, in the order data flows:
+#
+#   game-server pod:/metrics/prometheus --scrape--> Prometheus
+#                                                        |
+#                                        prometheus-adapter reads Prometheus,
+#                                        answers the custom.metrics.k8s.io API
+#                                                        |
+#                                                   HPA controller
+#
+# Without this file, game-server.yaml's HPA is inert: minReplicas forever,
+# because nothing implements custom.metrics.k8s.io/v1beta1 for it to query.
+# Written correctly against the standard prometheus-community/prometheus and
+# kubernetes-sigs/prometheus-adapter shapes; not verified against a live
+# cluster (none was reachable in this sandbox - see Server_Design.md).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    scrape_configs:
+      - job_name: game-server
+        metrics_path: /metrics/prometheus
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: game-server
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__address__]
+            action: replace
+            regex: ([^:]+)(?::\d+)?
+            replacement: $1:8766
+            target_label: __address__
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - port: 9090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus  # needs pod-list/get RBAC for kubernetes_sd_configs
+      containers:
+        - name: prometheus
+          image: prom/prometheus:latest
+          ports:
+            - containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: default
+---
+# prometheus-adapter: translates the `active_rooms` series Prometheus scraped
+# (one series per pod, matching the HPA's `type: Pods` expectation) into the
+# custom.metrics.k8s.io API the HPA controller actually queries.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: adapter-config
+data:
+  config.yaml: |
+    rules:
+      - seriesQuery: 'active_rooms{namespace!="",pod!=""}'
+        resources:
+          overrides:
+            namespace: {resource: "namespace"}
+            pod: {resource: "pod"}
+        name:
+          matches: "active_rooms"
+          as: "active_rooms"
+        metricsQuery: 'active_rooms{<<.LabelMatchers>>}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-adapter
+  labels:
+    app: prometheus-adapter
+spec:
+  selector:
+    app: prometheus-adapter
+  ports:
+    - port: 443
+      targetPort: 6443
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-adapter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-adapter
+  template:
+    metadata:
+      labels:
+        app: prometheus-adapter
+    spec:
+      containers:
+        - name: prometheus-adapter
+          image: registry.k8s.io/prometheus-adapter/prometheus-adapter:latest
+          args:
+            - --prometheus-url=http://prometheus:9090
+            - --config=/etc/adapter/config.yaml
+            - --secure-port=6443
+          ports:
+            - containerPort: 6443
+          volumeMounts:
+            - name: config
+              mountPath: /etc/adapter
+      volumes:
+        - name: config
+          configMap:
+            name: adapter-config
+---
+# Registers prometheus-adapter as the implementation of custom.metrics.k8s.io,
+# the API server the HPA controller actually calls - the step that makes the
+# whole pipeline visible to Kubernetes, not just to Prometheus.
+apiVersion: apiregistration.k8s.io/v1
+kind: APIService
+metadata:
+  name: v1beta1.custom.metrics.k8s.io
+spec:
+  service:
+    name: prometheus-adapter
+    namespace: default
+  group: custom.metrics.k8s.io
+  version: v1beta1
+  insecureSkipTLSVerify: true
+  groupPriorityMinimum: 100
+  versionPriority: 100

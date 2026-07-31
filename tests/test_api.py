@@ -1,5 +1,5 @@
 from config import settings
-from server.api import handle_health, handle_login, handle_metrics
+from server.api import handle_health, handle_login, handle_metrics, handle_metrics_prometheus
 from server.tokens import InMemoryTokenStore
 from tests.support import FakeAccountStore
 
@@ -51,3 +51,10 @@ class _FakeService:
 
 def test_metrics_reports_the_active_room_count():
     assert handle_metrics(_FakeService()) == (200, {"active_rooms": 7, "fleet_active_rooms": 19})
+
+
+def test_prometheus_metrics_exposes_active_rooms_in_exposition_format():
+    status, body = handle_metrics_prometheus(_FakeService())
+    assert status == 200
+    assert "active_rooms 7" in body
+    assert "# TYPE active_rooms gauge" in body

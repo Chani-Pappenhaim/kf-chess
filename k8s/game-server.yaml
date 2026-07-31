@@ -66,11 +66,11 @@ spec:
               cpu: "1"
               memory: "512Mi"
 ---
-# Autoscale on active_rooms (from /metrics), not CPU - a game server is I/O
-# and connection-bound, not CPU-bound. The `Pods` metric type requires a
-# custom-metrics API in the cluster (e.g. Prometheus + prometheus-adapter
-# scraping /metrics) - this HPA alone is not enough without that piece wired
-# up; it says what to scale on, not how the metric gets there.
+# Autoscale on active_rooms (from /metrics/prometheus), not CPU - a game
+# server is I/O and connection-bound, not CPU-bound. The `Pods` metric type
+# needs a custom-metrics API in the cluster to answer it - see
+# k8s/prometheus-adapter.yaml, which scrapes /metrics/prometheus and serves
+# custom.metrics.k8s.io; this HPA is inert without that file also applied.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
