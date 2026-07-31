@@ -36,6 +36,11 @@ class GameService:
         """How many games this server is running - the autoscaling signal."""
         return self._lobby.room_count()
 
+    def fleet_active_rooms(self):
+        """How many games are running anywhere in the fleet - a dashboard's
+        view, distinct from this one process's autoscaling signal."""
+        return self._lobby.fleet_room_count()
+
     def admit(self, opening, send):
         """Resolve a client's opening Connect(token). Returns (session,
         replies): a home-screen session to run, or None when refused, and the

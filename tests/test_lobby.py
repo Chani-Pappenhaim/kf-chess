@@ -80,3 +80,42 @@ def test_room_count_reflects_what_is_live():
     hall.create()
     hall.create()
     assert hall.room_count() == 2
+
+
+class FakeActiveRooms:
+    def __init__(self):
+        self.started = []
+        self.ended = []
+
+    def mark_started(self, room_id):
+        self.started.append(room_id)
+
+    def mark_ended(self, room_id):
+        self.ended.append(room_id)
+
+    def count(self):
+        return len(self.started) - len(self.ended)
+
+
+def test_creating_a_room_marks_it_started_in_the_registry():
+    active_rooms = FakeActiveRooms()
+    hall = Lobby(lambda room_id: FakeRoom(room_id), "test-server", active_rooms)
+    room = hall.create()
+    assert active_rooms.started == [room.id]
+
+
+def test_an_emptied_room_is_marked_ended_in_the_registry():
+    active_rooms = FakeActiveRooms()
+    hall = Lobby(lambda room_id: FakeRoom(room_id), "test-server", active_rooms)
+    room = hall.create()
+    room.is_empty = True
+    hall.tick(1)
+    assert active_rooms.ended == [room.id]
+
+
+def test_fleet_room_count_reads_the_registry_not_the_local_map():
+    active_rooms = FakeActiveRooms()
+    hall = Lobby(lambda room_id: FakeRoom(room_id), "test-server", active_rooms)
+    hall.create()
+    hall.create()
+    assert hall.fleet_room_count() == 2

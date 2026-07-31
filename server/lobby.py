@@ -8,11 +8,14 @@ class knows nothing about - it only runs whatever rooms it is asked to.
 """
 from __future__ import annotations
 
+from server.active_rooms import InMemoryActiveRooms
+
 
 class Lobby:
-    def __init__(self, room_factory, server_id):
+    def __init__(self, room_factory, server_id, active_rooms=None):
         self._new_room = room_factory
         self._server_id = server_id
+        self._active_rooms = active_rooms or InMemoryActiveRooms()
         self._rooms = {}
         self._next_id = 1  # room ids count up per server, so they stay readable
 
@@ -25,6 +28,7 @@ class Lobby:
             self._next_id += 1
         room = self._new_room(room_id)
         self._rooms[room_id] = room
+        self._active_rooms.mark_started(room_id)
         return room
 
     def get_or_create(self, room_id):
@@ -39,10 +43,16 @@ class Lobby:
         """How many rooms are live here right now - the autoscaling signal."""
         return len(self._rooms)
 
+    def fleet_room_count(self):
+        """How many rooms are live anywhere in the fleet - a dashboard's view,
+        not this one process's; identical to room_count() when not distributed."""
+        return self._active_rooms.count()
+
     def tick(self, dt):
         """Advance every room, then drop any that no one is left in."""
         for room in list(self._rooms.values()):
             room.tick(dt)
-        self._rooms = {
-            room_id: room for room_id, room in self._rooms.items() if not room.is_empty
-        }
+        emptied = [room_id for room_id, room in self._rooms.items() if room.is_empty]
+        for room_id in emptied:
+            del self._rooms[room_id]
+            self._active_rooms.mark_ended(room_id)

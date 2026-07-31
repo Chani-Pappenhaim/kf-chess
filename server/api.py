@@ -28,8 +28,12 @@ def handle_health():
 
 
 def handle_metrics(service):
-    """The autoscaling signal: how many games this server is running."""
-    return 200, {"active_rooms": service.active_rooms()}
+    """The autoscaling signal (this server's own rooms), plus the fleet-wide
+    count for a dashboard - the same number when there is only one server."""
+    return 200, {
+        "active_rooms": service.active_rooms(),
+        "fleet_active_rooms": service.fleet_active_rooms(),
+    }
 
 
 class ApiGateway:  # pragma: no cover - http shell, exercised by running it

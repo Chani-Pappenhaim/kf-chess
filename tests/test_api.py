@@ -45,6 +45,9 @@ class _FakeService:
     def active_rooms(self):
         return 7
 
+    def fleet_active_rooms(self):
+        return 19
+
 
 def test_metrics_reports_the_active_room_count():
-    assert handle_metrics(_FakeService()) == (200, {"active_rooms": 7})
+    assert handle_metrics(_FakeService()) == (200, {"active_rooms": 7, "fleet_active_rooms": 19})

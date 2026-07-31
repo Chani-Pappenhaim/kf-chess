@@ -16,6 +16,7 @@ from config import settings
 from events.bus import EventBus
 from game.composition import build_engine, build_registry
 from logs.activity_log import file_log
+from server.active_rooms import InMemoryActiveRooms, RedisActiveRooms
 from server.allocator import GameAllocator, parse_pool
 from server.api import ApiGateway
 from server.broadcast import subscribe_broadcast
@@ -55,22 +56,26 @@ def build_room(room_id, config, store):
     return room
 
 
-def build_service(config=settings, store=None, tokens=None, queue=None, bus=None):
+def build_service(config=settings, store=None, tokens=None, queue=None, bus=None, active_rooms=None):
     """The server, wired to host many games. Returns the outbox (to drain) and
     the service the socket drives.
 
-    `store`, `tokens`, `queue`, and `bus` are injectable so a test can pass
-    fakes instead of real infrastructure; the server proper builds them from
-    config and shares them with the API Gateway (see run()). Room placement is
-    computed from GAME_SERVERS, the same pool the WebSocket Gateway routes by -
-    a single entry (the default) always resolves to this one server.
+    `store`, `tokens`, `queue`, `bus`, and `active_rooms` are injectable so a
+    test can pass fakes instead of real infrastructure; the server proper
+    builds them from config and shares them with the API Gateway (see run()).
+    Room placement is computed from GAME_SERVERS, the same pool the WebSocket
+    Gateway routes by - a single entry (the default) always resolves to this
+    one server.
     """
     accounts = store or _default_account_store(config)
     session_tokens = tokens or InMemoryTokenStore()
     matchmaking_queue = queue or InMemoryMatchmakingQueue(config)
     allocator = GameAllocator(parse_pool(config.GAME_SERVERS).keys())
     outbox = Outbox()
-    lobby = Lobby(lambda room_id: build_room(room_id, config, accounts), config.SERVER_ID)
+    lobby = Lobby(
+        lambda room_id: build_room(room_id, config, accounts), config.SERVER_ID,
+        active_rooms or InMemoryActiveRooms(),
+    )
     matchmaker = Matchmaker(lobby, matchmaking_queue, config, allocator, config.SERVER_ID, bus)
     return outbox, GameService(lobby, matchmaker, session_tokens, config)
 
@@ -89,11 +94,15 @@ def run(config=settings):  # pragma: no cover - runs until interrupted
         tokens = RedisTokenStore(config.REDIS_URL)
         queue = RedisMatchmakingQueue(config.REDIS_URL, config)
         bus = RedisPubSub(config.REDIS_URL)
+        active_rooms = RedisActiveRooms(config.REDIS_URL)
     else:
         tokens = InMemoryTokenStore()
         queue = InMemoryMatchmakingQueue(config)
         bus = None
-    outbox, service = build_service(config, store=accounts, tokens=tokens, queue=queue, bus=bus)
+        active_rooms = None
+    outbox, service = build_service(
+        config, store=accounts, tokens=tokens, queue=queue, bus=bus, active_rooms=active_rooms,
+    )
     ApiGateway(config, accounts, tokens, service).start()
     log = file_log(config.SERVER_LOG_PATH, "kfchess.server")
     try:

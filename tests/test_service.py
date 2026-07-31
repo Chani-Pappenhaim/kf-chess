@@ -83,6 +83,9 @@ class _FakeLobby:
     def room_count(self):
         return 3
 
+    def fleet_room_count(self):
+        return 11
+
 
 class _FakeMatchmaker:
     def __init__(self):
@@ -115,3 +118,8 @@ def test_departing_lets_the_session_clean_up_after_itself():
 def test_active_rooms_reports_the_lobbys_count():
     service = GameService(_FakeLobby(), _FakeMatchmaker(), None, settings)
     assert service.active_rooms() == 3
+
+
+def test_fleet_active_rooms_reports_the_lobbys_fleet_count():
+    service = GameService(_FakeLobby(), _FakeMatchmaker(), None, settings)
+    assert service.fleet_active_rooms() == 11
