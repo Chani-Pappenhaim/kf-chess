@@ -188,6 +188,14 @@ ACCOUNTS_DB = os.environ.get("KF_ACCOUNTS_DB", os.path.join(_PROJECT_ROOT, "acco
 STARTING_RATING = 1200
 ELO_K_FACTOR = 32
 
+# Every /login reply (new account, wrong password, or success alike) waits a
+# random extra beat in this range before it is sent - defense in depth against
+# timing analysis beyond what equal-cost pbkdf2 hashing and constant-time
+# comparison already close. Applied uniformly to every outcome: jittering only
+# the failure case would itself become a new signal.
+LOGIN_JITTER_MIN_MS = 0
+LOGIN_JITTER_MAX_MS = 150
+
 # --- Rooms, matchmaking, and disconnect (slides 6-7) -----------------------
 # Only server/ and client/ read these. Every duration is measured from the
 # injected tick, never wall-clock, so the server clock stays the only clock.

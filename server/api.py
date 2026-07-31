@@ -4,7 +4,9 @@ side of the server. The game socket only ever admits an already-issued token.
 from __future__ import annotations
 
 import json
+import random
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from server.auth import account_for
@@ -61,7 +63,9 @@ def _handler_for(store, tokens, service, config):  # pragma: no cover - http she
                 return
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length))
-            self._reply(*handle_login(store, tokens, config, body))
+            status, payload = handle_login(store, tokens, config, body)
+            time.sleep(random.uniform(config.LOGIN_JITTER_MIN_MS, config.LOGIN_JITTER_MAX_MS) / 1000)
+            self._reply(status, payload)
 
         def _reply(self, status, payload):
             data = json.dumps(payload).encode("utf-8")
