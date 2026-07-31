@@ -170,71 +170,75 @@ One process caps out around, optimistically, tens of thousands of concurrent
 websockets. 10M concurrent needs a **fleet**, and the whole game is: *how does
 the fleet agree on who owns which room?*
 
-### The component diagram (in text)
+### The component diagram
 
-```
-                         Players (10M concurrent, worldwide)
-                                     │  (WSS)
-        ┌────────────────────────────┼────────────────────────────┐
-        │                            │                             │
-   ┌────▼─────┐                 ┌────▼─────┐                  ┌────▼─────┐
-   │  EDGE /  │   Regional      │  EDGE /  │                  │  EDGE /  │   ← stateless
-   │ GATEWAY  │   (US / EU /    │ GATEWAY  │   ... N of them  │ GATEWAY  │     TLS termination,
-   │  (LB)    │    APAC)        │  (LB)    │                  │  (LB)    │     auth check, routing
-   └────┬─────┘                 └────┬─────┘                  └────┬─────┘
-        │ "which server owns room R?" (looked up once per connection)
-        │
-        ├──────────────► ┌─────────────────────┐   ◄── source of truth for
-        │                │  ROOM DIRECTORY      │       "room → game-server"
-        │                │  (Redis cluster:     │
-        │                │   room_id → server)  │
-        │                └─────────────────────┘
-        │
-   ┌────▼─────────────── STICKY per-room routing ───────────────────┐
-   │                                                                │
-┌──▼───────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐    ┌──────▼───┐
-│  GAME    │   │  GAME    │   │  GAME    │   │  GAME    │ ...│  GAME    │  ← STATEFUL, ephemeral
-│ SERVER 1 │   │ SERVER 2 │   │ SERVER 3 │   │ SERVER 4 │    │ SERVER K │    owns clock + board
-│ (rooms)  │   │ (rooms)  │   │          │   │          │    │          │    for its rooms only
-└────┬─────┘   └────┬─────┘   └──────────┘   └──────────┘    └────┬─────┘
-     │              │                                             │
-     └──────────────┴──────────── MESSAGE BUS (pub/sub) ──────────┘
-                                     │  (game-ended, capture, chat, presence events)
-        ┌────────────────┬──────────┼───────────┬──────────────────┐
-   ┌────▼─────┐    ┌──────▼───┐ ┌────▼─────┐ ┌───▼──────┐    ┌───────▼──────┐
-   │  MATCH-  │    │ PRESENCE │ │  CHAT    │ │ PERSIST- │    │  ACTIVITY /  │
-   │ MAKING   │    │ SERVICE  │ │ SERVICE  │ │  ENCE    │    │  LOG SINK    │
-   │(stateless│    │ (Redis-  │ │          │ │ WORKER   │    │ (object      │
-   │ + queue) │    │  backed) │ │          │ │(→ DBs)   │    │  storage)    │
-   └────┬─────┘    └──────────┘ └──────────┘ └────┬─────┘    └──────────────┘
-        │                                         │
-        └──────────► ┌──────────────┐  ┌──────────▼────────┐  ┌───────────────┐
-                     │  ACCOUNTS/   │  │  MATCH HISTORY    │  │  Object store │
-                     │  RATINGS     │  │  (wide-column     │  │  (logs)       │
-                     │ (sharded SQL)│  │   NoSQL)          │  │               │
-                     └──────────────┘  └───────────────────┘  └───────────────┘
+> Superseded from the first draft below: there is **no stored room directory**.
+> `server = hash(room_id)` is a pure function every gateway and every game-server
+> computes locally - nothing to write, nothing to go stale. See "The core
+> problem" underneath for why, and what actually replaced it (`server/allocator.py`,
+> implemented and tested this way, not just designed).
+
+```mermaid
+flowchart TB
+    players(["Players (10M concurrent, worldwide)"])
+    players -->|WSS| gw1["EDGE / GATEWAY<br/>(stateless: TLS, auth check,<br/>hash(room_id) routing)"]
+    players -->|WSS| gw2["EDGE / GATEWAY<br/>...N of them, regional"]
+
+    gw1 -->|"hash(room_id) picked locally,<br/>no lookup"| gs1
+    gw2 -->|"hash(room_id) picked locally,<br/>no lookup"| gs2
+
+    subgraph shards ["GAME SERVER SHARDS - stateful, ephemeral, own clock + board"]
+        gs1["GAME SERVER 1<br/>(rooms)"]
+        gs2["GAME SERVER 2<br/>(rooms)"]
+        gs3["GAME SERVER K<br/>..."]
+    end
+
+    gs1 <--> bus{{"MESSAGE BUS (pub/sub)<br/>game-ended, capture, chat, presence"}}
+    gs2 <--> bus
+    gs3 <--> bus
+
+    bus --> mm["MATCHMAKING<br/>(stateless + shared Redis queue)"]
+    bus --> pr["PRESENCE / ACTIVE ROOMS<br/>(Redis-backed, observability only -<br/>not consulted for routing)"]
+    bus --> ch["CHAT SERVICE"]
+    bus --> pw["PERSISTENCE WORKER<br/>(consumes bus -> DBs)"]
+    bus --> log["ACTIVITY / LOG SINK<br/>(object storage)"]
+
+    mm --> db1[("ACCOUNTS / RATINGS<br/>(sharded SQL)")]
+    pw --> db1
+    pw --> db2[("MATCH HISTORY<br/>(wide-column NoSQL)")]
 ```
 
 ### The core problem: "which server owns this room?"
 
 Because a game-room server is **stateful** (it holds the live board and *is* the
 clock), a player's moves must always reach the *one* server that owns their room.
-Two mechanisms, used together:
+**One mechanism answers this, not two:**
 
-1. **A room directory (registry).** A small, fast, shared map
-   `room_id → game_server_id`, stored in the **Redis cluster**. When a room is
-   created, the owning game-server writes its ID here; when it tears down, it
-   deletes the entry. Every gateway consults this map to route a player's socket
-   to the correct game-server. This is the authoritative "who owns what," and it
-   is the direct network descendant of today's in-process room table.
+**Consistent hashing** is both the placement rule and the lookup rule:
+`server = hash_ring(room_id)`. There is no separate "authoritative record" to
+keep in sync with it, because the hash *is* the authoritative record - any
+gateway, any game-server, any client can compute the same answer independently,
+with nothing to write on room creation and nothing to go stale on room teardown.
+A hash ring (not `hash() % N`) is used so that adding or removing a game-server
+only reshuffles ~`1/K` of rooms instead of remapping everything. Implemented in
+`server/allocator.py::GameAllocator`, used identically by the WebSocket Gateway
+(`server/ws_gateway.py::plan_route`) and by matchmaking when it mints a fresh
+room id (`server/matchmaking.py`).
 
-2. **Consistent hashing** as the *placement* rule for **new** rooms and for
-   spreading load. `server = hash_ring(room_id)` picks a home server from the
-   live set. Consistent hashing (a hash ring) is specifically chosen so that when
-   you add or remove a game-server, only ~`1/K` of rooms are affected instead of
-   remapping everything. It answers "where should a *new* room go"; the directory
-   answers "where did room R *actually* end up" (the authoritative record, since
-   a server may have been added/removed since).
+*Earlier draft of this document proposed a Redis-backed "room directory"
+(`room_id → server`) alongside the hash ring, with the hash only deciding
+*new*-room placement and the directory being the source of truth for *existing*
+rooms. Building it surfaced the actual question: once placement is a pure
+function of `room_id`, a stored record of the same fact adds a second source of
+truth that can disagree with the first - two names for one number, one of which
+can go stale. It was cut once that redundancy was visible, not before.*
+
+There **is** a small piece of Redis state in the final design, but it plays a
+different role: an **active-rooms presence registry** (`server/active_rooms.py`)
+that servers write to when a room opens/closes, read only for fleet-wide
+observability (a dashboard asking "how many games are running anywhere," see
+`/metrics`'s `fleet_active_rooms`) - never consulted to route a player. Losing it
+loses a number on a dashboard, not the ability to find a room.
 
 Once a socket is routed, it is **sticky**: that player's connection stays pinned
 to the owning game-server for the life of the (short) game. Stickiness is at the
@@ -243,23 +247,37 @@ to the owning game-server for the life of the (short) game. Stickiness is at the
 ### How "everyone can play everyone" and "join any room" work across servers
 
 - **Matchmaking is global, placement is local.** The matchmaking service is
-  *stateless* and backed by a shared queue (Redis). Any player from any region
-  hits any matchmaking replica; it pops two compatible players from the shared
-  queue — they can be on opposite sides of the planet and connected to different
-  gateways. So "everyone can play everyone" holds because the *queue* is global,
-  not per-server.
-- When two players match, matchmaking **assigns a game-server** (via the hash
-  ring / least-loaded pick), writes `room_id → server` to the directory, and
-  hands both players that room. Both gateways then route both sockets to the same
-  game-server. The two players never needed to be on the same gateway or region.
-- **Joining an existing room** (as player or viewer): look up `room_id` in the
-  directory → get the owning server → route the socket there. Works identically
-  whether you're joining as a rated player or as a spectator; spectators are just
-  read-only subscribers on that room's event stream.
+  *stateless* and backed by a shared queue (Redis), partitioned by rating range.
+  Any player from any region hits any matchmaking replica; it pops two
+  compatible players from the shared queue - they can be on opposite sides of
+  the planet and connected to different gateways. So "everyone can play
+  everyone" holds because the *queue* is global, not per-server.
+- When two players match, matchmaking **mints a room id and hashes it**
+  (`hash_ring(room_id)`) to find the owning server, and hands both players that
+  room - symmetrically: whichever of the two is co-located with the target seats
+  locally, the other (and, if neither is, both) gets `Redirected(room_id)` and
+  reconnects there. The two players never needed to be on the same gateway or
+  region, and no write to any directory happens in between.
+- **Joining an existing room** (as player or viewer): the same
+  `hash_ring(room_id)` computation the joiner's own gateway can do locally -
+  route the socket there. Works identically whether you're joining as a rated
+  player or as a spectator; spectators are just read-only subscribers on that
+  room's event stream.
 - **Cross-server events** (a capture, game-ended, chat) fan out over the
   **message bus**, so spectators, the persistence worker, and presence all learn
-  about them without the game-server knowing their addresses — the same
+  about them without the game-server knowing their addresses - the same
   publish/subscribe decoupling the repo already uses in-process.
+- **Reconnecting mid-game.** Within the *same* game-server process, a dropped
+  socket does not lose the seat: the room keeps counting down a resign grace
+  period, and a session that reconnects with the same account is recognised and
+  reseated in its own colour (`PlayerRegistry.seated_color`), not turned into a
+  viewer. If the *process itself* dies mid-game, its rooms' live state (board,
+  clock, in-flight moves) dies with it - deliberately not mirrored to Redis on
+  every tick. For a 30-90s game the cost of doing that (serialising the whole
+  board+arbiter+cooldown state on every move, for a failure mode that only
+  matters for a handful of seconds of a short game) outweighs the benefit; the
+  client instead returns its player to the home screen to re-queue for a fresh
+  match, the same "resign/refund and re-queue" call made below in Part 4.
 
 ### Which roles split into separate services
 
@@ -443,8 +461,9 @@ state.
 2. Persistence worker consumes it → writes the *one* durable result row (result
    + rating delta) to sharded SQL, appends to match-history NoSQL, logs to object
    storage.
-3. Game-server deletes `room_id` from the room directory and drops the in-memory
-   board, releasing RAM.
+3. Game-server marks `room_id` ended in the active-rooms registry and drops the
+   in-memory board, releasing RAM - nothing routes through that registry, so
+   nothing else needs to be told.
 4. Sockets close or return to the lobby; players re-queue for a fresh match.
 5. On scale-down, the orchestrator marks a game-server *unschedulable for new
    rooms*, lets its existing rooms finish (~≤90s), then terminates the
@@ -463,8 +482,8 @@ state.
   state.
 - **Split by statefulness:** stateless edge/matchmaking/persistence scale by
   cloning behind load balancers; the **stateful game-server** is the one hard
-  case, scaled by adding replicas and routed to via a **room directory** +
-  **consistent hashing**.
+  case, scaled by adding replicas and routed to via **consistent hashing alone**
+  - a pure function, so no directory has to be kept in sync with it.
 - **"Everyone plays everyone"** comes from a *global shared matchmaking queue*,
   not from co-locating players; cross-server events ride a **pub/sub bus** (the
   networked twin of the repo's existing `EventBus`).
