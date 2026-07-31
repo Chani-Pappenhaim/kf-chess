@@ -44,8 +44,15 @@ class Room:
 
     def join(self, session):
         """Seat `session` (White, then Black, then viewer), tell it where it
-        landed, and start the game once both seats are taken."""
-        color = self._registry.seat(session.account)  # None when the room is full
+        landed, and start the game once both seats are taken. A player
+        reconnecting mid-disconnect-grace gets their own seat back, resigning
+        countdown cancelled, instead of being turned into a viewer."""
+        color = self._registry.seated_color(session.account.username)
+        if color is not None:
+            if self._resigning == color:
+                self._cancel_countdown()
+        else:
+            color = self._registry.seat(session.account)  # None when the room is full
         session.enter_room(self, color, self._engine, self._height)
         self._members.append(session)
         session.send(encode(RoomEntered(color, self._id, color is None)))

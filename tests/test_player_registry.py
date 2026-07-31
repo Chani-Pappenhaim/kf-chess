@@ -85,3 +85,14 @@ def test_the_freed_seat_can_be_retaken_by_the_same_name():
     registry.seat(account("dana"))
     registry.leave("w")
     assert registry.seat(account("dana")) == "w"
+
+
+def test_seated_color_finds_a_still_seated_player():
+    registry = PlayerRegistry(COLORS)
+    registry.seat(account("dana"))
+    assert registry.seated_color("dana") == "w"
+
+
+def test_seated_color_is_none_for_an_empty_seat():
+    registry = PlayerRegistry(COLORS)
+    assert registry.seated_color("dana") is None

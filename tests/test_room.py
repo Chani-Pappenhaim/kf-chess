@@ -168,3 +168,28 @@ def test_a_lone_player_leaving_just_empties_the_room():
     assert r.is_empty
     r.tick(settings.DISCONNECT_GRACE_MS)
     assert engine.game_over is False
+
+
+def test_a_reconnecting_player_gets_their_own_seat_back_not_a_viewer_seat():
+    r, engine = room()
+    white, black = FakeSession("dana"), FakeSession("yossi")
+    r.join(white)
+    r.join(black)
+    r.leave(black)                     # starts the resign countdown
+    reconnected = FakeSession("yossi")
+    r.join(reconnected)
+    assert reconnected.color == "b"
+    r.tick(settings.DISCONNECT_GRACE_MS)
+    assert engine.game_over is False   # the countdown was cancelled, not just outrun
+
+
+def test_a_reconnecting_player_is_not_told_they_are_a_spectator():
+    r, _ = room()
+    white, black = FakeSession("dana"), FakeSession("yossi")
+    r.join(white)
+    r.join(black)
+    r.leave(black)
+    reconnected = FakeSession("yossi")
+    r.join(reconnected)
+    entered = replies(reconnected)[0]
+    assert (entered.color, entered.spectator) == ("b", False)

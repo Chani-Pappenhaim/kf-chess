@@ -32,7 +32,15 @@ class PlayerRegistry:
         return None
 
     def _already_seated(self, username):
-        return any(account.username == username for account in self._by_color.values())
+        return self.seated_color(username) is not None
+
+    def seated_color(self, username):
+        """The colour `username` already holds, or None - lets a reconnecting
+        player be recognised instead of turned into a fresh seat/viewer."""
+        for color, account in self._by_color.items():
+            if account.username == username:
+                return color
+        return None
 
     def leave(self, color):
         """Free a colour when its player disconnects, so the seat can be retaken."""
