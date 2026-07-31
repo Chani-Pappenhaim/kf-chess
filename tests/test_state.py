@@ -42,6 +42,16 @@ def test_no_limit_keeps_the_whole_move_history():
     assert len(encode_model(model)["moves"]) == 5
 
 
+def test_a_zero_limit_sends_no_moves_at_all():
+    # `moves[-0:]` is Python's own trap: -0 == 0, so a naive slice would return
+    # the whole list instead of nothing - this is the case that catches it.
+    model = RenderModel(
+        pieces=(), width=8, height=8,
+        moves=tuple(MoveRecord("w", f"e2e{i}", i) for i in range(5)),
+    )
+    assert encode_model(model, move_history_limit=0)["moves"] == []
+
+
 def test_cells_come_back_as_tuples():
     # A list would compare unequal to every cell in the rest of the code, and
     # could not be used as a key at all.

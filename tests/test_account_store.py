@@ -1,3 +1,7 @@
+import os
+import tempfile
+import threading
+
 from accounts.store import Account, AccountStore
 from accounts.sqlite_store import SqliteAccountStore
 
@@ -67,3 +71,34 @@ def test_two_players_keep_separate_accounts():
     assert db.authenticate("dana", "one").username == "dana"
     assert db.authenticate("yossi", "two").username == "yossi"
     assert db.authenticate("dana", "two") is None
+
+
+def test_concurrent_registrations_from_many_threads_all_land():
+    # /login is served by ThreadingHTTPServer - a fresh thread per request -
+    # sharing this one connection. Without the store's lock, concurrent writers
+    # race on the connection's transaction state (reliably reproduces as
+    # "cannot commit - no transaction is active" on a real file - :memory:
+    # does not stress it the same way, so a real file is used here).
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        db = SqliteAccountStore(path, STARTING)
+        errors = []
+
+        def register(i):
+            try:
+                db.register(f"player-{i}", "pw")
+            except Exception as error:  # noqa: BLE001 - any exception here is the bug
+                errors.append(error)
+
+        threads = [threading.Thread(target=register, args=(i,)) for i in range(100)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        assert errors == []
+        assert all(db.exists(f"player-{i}") for i in range(100))
+    finally:
+        db._db.close()  # Windows can't remove a file its own open handle still holds
+        os.remove(path)
