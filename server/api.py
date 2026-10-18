@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
 from server.auth import account_for
+from tls import server_context
 
 
 def handle_login(store, tokens, config, body):
@@ -86,6 +87,9 @@ class ApiGateway:  # pragma: no cover - http shell, exercised by running it
             self._store, self._tokens, self._service, self._history, self._config, hashing,
         )
         httpd = ThreadingHTTPServer((self._config.API_HOST, self._config.API_PORT), handler)
+        context = server_context(self._config)
+        if context is not None:
+            httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
 

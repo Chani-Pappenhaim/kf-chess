@@ -8,6 +8,8 @@ import json
 import urllib.error
 import urllib.request
 
+from tls import client_context
+
 
 def decide(status, payload):
     """(token, new_account) from a login response, or None when refused."""
@@ -22,7 +24,9 @@ def http_login(config, username, password):  # pragma: no cover - real network I
         config.API_LOGIN_URL, data=body, headers={"Content-Type": "application/json"}
     )
     try:
-        with urllib.request.urlopen(request) as response:
+        # None (TLS off) falls back to urlopen's own default handling of a
+        # plain http:// URL, exactly as before this option existed.
+        with urllib.request.urlopen(request, context=client_context(config)) as response:
             return decide(response.status, json.loads(response.read()))
     except urllib.error.HTTPError as error:
         return decide(error.code, json.loads(error.read()))

@@ -16,6 +16,7 @@ from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
 from protocol.errors import ProtocolError
+from tls import server_context
 
 
 class WebSocketServer:  # pragma: no cover - socket shell, exercised by running it
@@ -28,7 +29,7 @@ class WebSocketServer:  # pragma: no cover - socket shell, exercised by running 
 
     async def run(self):
         host, port = self._config.SERVER_HOST, self._config.SERVER_PORT
-        async with serve(self._client, host, port):
+        async with serve(self._client, host, port, ssl=server_context(self._config)):
             await self._pump()
 
     async def _client(self, connection):

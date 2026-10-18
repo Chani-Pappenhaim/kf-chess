@@ -111,12 +111,23 @@ END_BANNER_TEXT = "{winner} WINS"
 # to 0.0.0.0 so the server is reachable from outside it.
 SERVER_HOST = os.environ.get("KF_SERVER_HOST", "localhost")
 SERVER_PORT = int(os.environ.get("KF_SERVER_PORT", "8765"))
-SERVER_URL = f"ws://{SERVER_HOST}:{SERVER_PORT}"
+
+# TLS (server/socket.py, server/ws_gateway.py, client/socket.py): unset by
+# default, so a plain `python -m server` still needs nothing but itself and
+# talks ws:// exactly as before. Set both to a cert/key pair (e.g. from
+# scripts/generate_dev_cert.py) to switch every socket in this process to
+# wss:// - client/socket.py and scripts/load_test.py pick that up from
+# SERVER_URL's own scheme, so nothing else has to be told separately.
+TLS_CERT_FILE = os.environ.get("KF_TLS_CERT_FILE", "")
+TLS_KEY_FILE = os.environ.get("KF_TLS_KEY_FILE", "")
+TLS_ENABLED = bool(TLS_CERT_FILE and TLS_KEY_FILE)
+
+SERVER_URL = f"{'wss' if TLS_ENABLED else 'ws'}://{SERVER_HOST}:{SERVER_PORT}"
 
 # The API Gateway: login over plain HTTP, separate from the game socket.
 API_HOST = os.environ.get("KF_API_HOST", "localhost")
 API_PORT = int(os.environ.get("KF_API_PORT", "8766"))
-API_LOGIN_URL = f"http://{API_HOST}:{API_PORT}/login"
+API_LOGIN_URL = f"{'https' if TLS_ENABLED else 'http'}://{API_HOST}:{API_PORT}/login"
 
 # Where the shared state lives once the server runs as more than one instance:
 # presence, the room directory, and the matchmaking queue. Defaults to a local

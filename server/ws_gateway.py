@@ -14,6 +14,7 @@ from websockets.exceptions import ConnectionClosed
 from config import settings
 from protocol.messages import CreateRoom, JoinRoom, Rejected, decode, encode
 from server.allocator import GameAllocator, mint_room_id, parse_pool
+from tls import server_context
 
 
 def plan_route(message, first, allocator):
@@ -47,7 +48,14 @@ class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running
         self._allocator = GameAllocator(pool.keys())
 
     async def run(self):
-        async with serve(self._client, self._config.GATEWAY_HOST, self._config.GATEWAY_PORT):
+        # TLS terminates here, at the edge the public internet actually
+        # reaches - the upstream hop to a Game Server (connect_upstream
+        # below) stays plain ws://, the same "encrypt at the edge, trust the
+        # private network behind it" split a real cloud LB/ingress makes.
+        async with serve(
+            self._client, self._config.GATEWAY_HOST, self._config.GATEWAY_PORT,
+            ssl=server_context(self._config),
+        ):
             await asyncio.Future()
 
     async def _client(self, client_ws):

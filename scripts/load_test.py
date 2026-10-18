@@ -27,6 +27,7 @@ from websockets.asyncio.client import connect
 from client.login import http_login
 from config import settings
 from protocol.messages import Connect, MoveRequest, RoomEntered, SeekGame, StateUpdate, decode, encode
+from tls import client_context
 
 
 async def _play_one(config, index, connect_times, match_times, move_round_trips):
@@ -39,7 +40,7 @@ async def _play_one(config, index, connect_times, match_times, move_round_trips)
     token, _new_account = result
 
     start = time.perf_counter()
-    async with connect(config.SERVER_URL) as ws:
+    async with connect(config.SERVER_URL, ssl=client_context(config)) as ws:
         await ws.send(encode(Connect(token)))
         await ws.recv()  # Welcome
         connect_times.append(time.perf_counter() - start)

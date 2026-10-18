@@ -17,6 +17,7 @@ from websockets.asyncio.client import connect
 from websockets.exceptions import ConnectionClosed
 
 from protocol.errors import ProtocolError
+from tls import client_context
 
 _IDLE_SECONDS = 0.01  # how long the sender naps when there is nothing to send
 
@@ -56,7 +57,7 @@ class WebSocketClient:  # pragma: no cover - socket shell, exercised by running 
             self._on_lost(self._config.CONNECTION_LOST_TEXT)
 
     async def _talk(self):
-        async with connect(self._config.SERVER_URL) as connection:
+        async with connect(self._config.SERVER_URL, ssl=client_context(self._config)) as connection:
             self._log.note("connected " + self._config.SERVER_URL)
             await asyncio.gather(
                 self._receive(connection),
