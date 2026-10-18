@@ -13,6 +13,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs
 
 from server.auth import account_for
+from server.rate_limit import RateLimiter
 from tls import server_context
 
 
@@ -83,8 +84,12 @@ class ApiGateway:  # pragma: no cover - http shell, exercised by running it
         context-switching, not throughput, once every core is already busy.
         """
         hashing = ThreadPoolExecutor(max_workers=os.cpu_count())
+        login_limiter = RateLimiter(
+            self._config.LOGIN_RATE_LIMIT_CAPACITY, self._config.LOGIN_RATE_LIMIT_PER_SECOND
+        )
         handler = _handler_for(
-            self._store, self._tokens, self._service, self._history, self._config, hashing,
+            self._store, self._tokens, self._service, self._history, self._config,
+            hashing, login_limiter,
         )
         httpd = ThreadingHTTPServer((self._config.API_HOST, self._config.API_PORT), handler)
         context = server_context(self._config)
@@ -93,7 +98,7 @@ class ApiGateway:  # pragma: no cover - http shell, exercised by running it
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
 
-def _handler_for(store, tokens, service, history, config, hashing):  # pragma: no cover - http shell
+def _handler_for(store, tokens, service, history, config, hashing, login_limiter):  # pragma: no cover - http shell
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             path, _, query = self.path.partition("?")
@@ -112,6 +117,9 @@ def _handler_for(store, tokens, service, history, config, hashing):  # pragma: n
         def do_POST(self):
             if self.path != "/login":
                 self._reply(404, {"reason": "not found"})
+                return
+            if not login_limiter.allow(self.client_address[0]):
+                self._reply(429, {"reason": "too many requests"})
                 return
             length = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(length))

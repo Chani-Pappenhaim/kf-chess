@@ -128,3 +128,44 @@ def test_a_move_command_that_cannot_be_read_is_refused():
 def test_a_session_holds_the_colour_it_was_given():
     command, _, _ = handler(color="b")
     assert command.color == "b"
+
+
+# -- idempotency: a repeated msg_id must not act twice ----------------------
+
+def test_a_move_with_a_repeated_msg_id_is_applied_only_once():
+    command, engine, _ = handler(color="w", pieces={(6, 4): "wP"})
+    command.handle(encode(MoveRequest("WPe2e4", msg_id="abc")))
+    command.handle(encode(MoveRequest("WPe2e4", msg_id="abc")))  # a retried line
+    assert engine.moves == [((6, 4), (4, 4))]
+
+
+def test_a_jump_with_a_repeated_msg_id_is_applied_only_once():
+    command, engine, _ = handler(color="w", pieces={(7, 6): "wN"})
+    command.handle(encode(JumpRequest("g1", msg_id="xyz")))
+    command.handle(encode(JumpRequest("g1", msg_id="xyz")))
+    assert engine.jumps == [(7, 6)]
+
+
+def test_a_different_msg_id_is_not_treated_as_a_repeat():
+    command, engine, _ = handler(color="w", pieces={(6, 4): "wP"})
+    command.handle(encode(MoveRequest("WPe2e4", msg_id="one")))
+    command.handle(encode(MoveRequest("WPe2e4", msg_id="two")))
+    assert engine.moves == [((6, 4), (4, 4)), ((6, 4), (4, 4))]
+
+
+def test_the_seen_ids_window_forgets_the_oldest_once_it_is_full():
+    command, engine, _ = handler(color="w", pieces={(6, 4): "wP"})
+    for i in range(65):  # one past _MAX_SEEN_MSG_IDS
+        command.handle(encode(MoveRequest("WPe2e4", msg_id=f"id-{i}")))
+    # "id-0" was evicted to make room, so it is accepted again as if new.
+    command.handle(encode(MoveRequest("WPe2e4", msg_id="id-0")))
+    assert len(engine.moves) == 66
+
+
+def test_an_empty_msg_id_never_counts_as_a_repeat():
+    # Every existing test above sends no msg_id at all - this is the
+    # backward-compatibility guarantee that keeps them meaningful.
+    command, engine, _ = handler(color="w", pieces={(6, 4): "wP"})
+    command.handle(encode(MoveRequest("WPe2e4")))
+    command.handle(encode(MoveRequest("WPe2e4")))
+    assert engine.moves == [((6, 4), (4, 4)), ((6, 4), (4, 4))]

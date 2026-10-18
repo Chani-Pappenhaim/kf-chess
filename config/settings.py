@@ -235,6 +235,14 @@ HISTORY_LIMIT = 20
 # cost seconds of position, not the whole game.
 ROOM_SNAPSHOT_INTERVAL_MS = 1000
 
+# Rate limits (server/rate_limit.py), each a token bucket: a burst up to the
+# capacity, refilling steadily afterward. Nothing here is shared infra - each
+# connection/IP gets its own bucket, so this needs no Redis of its own.
+WS_RATE_LIMIT_CAPACITY = 20        # burst: this many commands with no delay
+WS_RATE_LIMIT_PER_SECOND = 10      # then steady-state: this many per second
+LOGIN_RATE_LIMIT_CAPACITY = 5
+LOGIN_RATE_LIMIT_PER_SECOND = 1
+
 # Every /login reply (new account, wrong password, or success alike) waits a
 # random extra beat in this range before it is sent - defense in depth against
 # timing analysis beyond what equal-cost pbkdf2 hashing and constant-time

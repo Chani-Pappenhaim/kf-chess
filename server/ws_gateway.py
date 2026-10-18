@@ -14,6 +14,7 @@ from websockets.exceptions import ConnectionClosed
 from config import settings
 from protocol.messages import CreateRoom, JoinRoom, Rejected, decode, encode
 from server.allocator import GameAllocator, mint_room_id, parse_pool
+from server.rate_limit import TokenBucket
 from tls import server_context
 
 
@@ -83,6 +84,9 @@ class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running
         finally:
             await upstream.close()
 
+    def _new_bucket(self):
+        return TokenBucket(self._config.WS_RATE_LIMIT_CAPACITY, self._config.WS_RATE_LIMIT_PER_SECOND)
+
     async def _route(self, client_ws, upstream, address, opening):
         """The client's first home-screen choice: a room-bound one (Join, or a
         fresh Create) reconnects to whichever server that room hashes to."""
@@ -125,9 +129,16 @@ class WebSocketGateway:  # pragma: no cover - socket shell, exercised by running
         return upstream, response
 
     async def _relay(self, client_ws, upstream):
+        # One bucket for this connection's lifetime - a client that floods
+        # the socket has its excess commands silently dropped rather than
+        # forwarded, instead of a bad client (or bug) being able to hammer a
+        # Game Server at whatever rate it can open a loop.
+        bucket = self._new_bucket()
+
         async def to_upstream():
             async for line in client_ws:
-                await upstream.send(line)
+                if bucket.allow():
+                    await upstream.send(line)
 
         async def to_client():
             async for line in upstream:

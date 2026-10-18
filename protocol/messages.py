@@ -30,16 +30,25 @@ class Connect:
 
 @dataclass(frozen=True)
 class MoveRequest:
-    """Move a piece. `command` is the wire form built by protocol.commands."""
+    """Move a piece. `command` is the wire form built by protocol.commands.
+
+    `msg_id` is an idempotency key the client mints once per command
+    (`client/gateway.py`): if a retry or a network hiccup delivers the same
+    line twice, `server/handler.py` recognises the repeat and acts on it only
+    once. Defaults to "" so a line from before this field existed still
+    decodes - an empty id simply never matches a previous one.
+    """
 
     command: str
+    msg_id: str = ""
 
 
 @dataclass(frozen=True)
 class JumpRequest:
-    """Jump the piece on `square`."""
+    """Jump the piece on `square`. See `MoveRequest.msg_id`."""
 
     square: str
+    msg_id: str = ""
 
 
 @dataclass(frozen=True)

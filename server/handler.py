@@ -15,6 +15,8 @@ an entry here and a method beside it.
 """
 from __future__ import annotations
 
+from collections import OrderedDict
+
 from game.squares import cell_of, square_of
 from protocol.commands import parse_move
 from protocol.errors import ProtocolError
@@ -26,6 +28,8 @@ from protocol.messages import (
     decode,
     encode,
 )
+
+_MAX_SEEN_MSG_IDS = 64  # a retried line arrives moments later; no need to remember more
 
 
 class CommandHandler:
@@ -39,6 +43,7 @@ class CommandHandler:
             JumpRequest: self._jump,
             HintsRequest: self._hints,
         }
+        self._seen_msg_ids = OrderedDict()  # msg_id -> None, oldest first
 
     @property
     def color(self):
@@ -59,14 +64,33 @@ class CommandHandler:
         action(message)
 
     def _move(self, message):
+        if self._is_duplicate(message.msg_id):
+            return
         command = parse_move(message.command, self._height)
         if self._owns(command.start):
             self._engine.request_move(command.start, command.end)
 
     def _jump(self, message):
+        if self._is_duplicate(message.msg_id):
+            return
         cell = cell_of(message.square, self._height)
         if self._owns(cell):
             self._engine.request_jump(cell)
+
+    def _is_duplicate(self, msg_id):
+        """Whether `msg_id` was already acted on this session - always False
+        for "" (a caller with nothing to dedupe against, including any client
+        from before this field existed). A network hiccup or a client retry
+        can deliver the same line twice; without this, a duplicate MoveRequest
+        would ask the engine to move an already-moved piece a second time."""
+        if not msg_id:
+            return False
+        if msg_id in self._seen_msg_ids:
+            return True
+        self._seen_msg_ids[msg_id] = None
+        if len(self._seen_msg_ids) > _MAX_SEEN_MSG_IDS:
+            self._seen_msg_ids.popitem(last=False)
+        return False
 
     def _hints(self, message):
         # Move hints are the one query only the server can answer, because the

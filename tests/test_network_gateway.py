@@ -3,7 +3,7 @@ from client.gateway import NetworkGateway
 from client.inbox import Inbox
 from config import settings
 from gateway.gateway import GameGateway
-from protocol.messages import HintsRequest, JumpRequest, MoveRequest, decode
+from protocol.messages import HintsRequest, decode
 
 
 def connected():
@@ -27,7 +27,9 @@ def test_the_model_to_draw_is_the_last_state_received():
 def test_a_move_goes_out_naming_the_piece_that_is_there():
     gateway, _inbox, sent = connected()
     gateway.request_move((6, 4), (4, 4))     # white pawn e2 -> e4
-    assert decode(sent[0]) == MoveRequest("WPe2e4")
+    message = decode(sent[0])
+    assert message.command == "WPe2e4"
+    assert message.msg_id  # a fresh idempotency key, not empty
 
 
 def test_a_move_from_an_empty_square_is_not_sent():
@@ -41,7 +43,16 @@ def test_a_move_from_an_empty_square_is_not_sent():
 def test_a_jump_goes_out_as_the_square_it_is_on():
     gateway, _inbox, sent = connected()
     gateway.request_jump((7, 6))             # white knight g1
-    assert decode(sent[0]) == JumpRequest("g1")
+    message = decode(sent[0])
+    assert message.square == "g1"
+    assert message.msg_id  # a fresh idempotency key, not empty
+
+
+def test_each_move_gets_a_different_msg_id():
+    gateway, _inbox, sent = connected()
+    gateway.request_move((6, 4), (4, 4))
+    gateway.request_move((6, 4), (4, 4))
+    assert decode(sent[0]).msg_id != decode(sent[1]).msg_id
 
 
 def test_asking_for_hints_sends_one_request_and_draws_none_yet():

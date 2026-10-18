@@ -11,6 +11,8 @@ state, like everything else.
 """
 from __future__ import annotations
 
+import secrets
+
 from game.squares import cell_of, square_of
 from protocol.commands import format_move
 from protocol.messages import HintsRequest, JumpRequest, MoveRequest, encode
@@ -33,12 +35,12 @@ class NetworkGateway:
             # name in the command, and nothing the server could move.
             return
         self._send(encode(MoveRequest(
-            format_move(piece.token, start, end, model.height)
+            format_move(piece.token, start, end, model.height), _new_msg_id()
         )))
 
     def request_jump(self, cell):
         model = self._inbox.model()
-        self._send(encode(JumpRequest(square_of(cell, model.height))))
+        self._send(encode(JumpRequest(square_of(cell, model.height), _new_msg_id())))
 
     def legal_targets(self, cell):
         """The squares `cell` may move to, as far as we have been told.
@@ -57,3 +59,9 @@ class NetworkGateway:
             self._asked = square
             self._send(encode(HintsRequest(square)))
         return ()
+
+
+def _new_msg_id():
+    """A short id unique enough to dedupe a retried line - not a security
+    token, just a value the server has almost certainly not seen before."""
+    return secrets.token_hex(8)
