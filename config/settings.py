@@ -127,7 +127,20 @@ REDIS_URL = os.environ.get("KF_REDIS_URL", "redis://localhost:6379")
 SERVER_ID = os.environ.get("KF_SERVER_ID", "local")
 
 # Accounts store: PostgreSQL when set, else the local SQLite file below.
+# KF_DATABASE_URLS (plural) takes priority when set: a comma-separated list of
+# Postgres URLs shards accounts by hash(username) across them
+# (accounts/sharded_store.py) instead of holding every account in one instance.
 DATABASE_URL = os.environ.get("KF_DATABASE_URL", "")
+DATABASE_URLS = [
+    url for url in os.environ.get("KF_DATABASE_URLS", "").split(",") if url
+]
+
+# Where finished-game results wait to be durably written (server/results_queue.py,
+# server/results_worker.py) - publishing here is fast and in-process; the actual
+# database write happens off the game server entirely, in a separate worker, so
+# it can never block a room's clock and a failed write retries instead of
+# silently losing the result.
+KAFKA_URL = os.environ.get("KF_KAFKA_URL", "localhost:9092")
 
 # Set to run several Game Servers behind a WebSocket Gateway: the room
 # directory and login tokens move to Redis (shared), instead of this one
