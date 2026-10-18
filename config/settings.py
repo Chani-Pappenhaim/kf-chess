@@ -126,6 +126,12 @@ REDIS_URL = os.environ.get("KF_REDIS_URL", "redis://localhost:6379")
 # This instance's identity, so its room ids stay unique among other instances.
 SERVER_ID = os.environ.get("KF_SERVER_ID", "local")
 
+# The region this instance reports for matchmaking (server/matchmaking_queue.py):
+# only seekers in the same region are paired. Defaults to one shared region, so
+# a single-region deployment (like this project's) matches everyone as before;
+# set differently per deployment to keep matches geographically close.
+REGION = os.environ.get("KF_REGION", "local")
+
 # Accounts store: PostgreSQL when set, else the local SQLite file below.
 # KF_DATABASE_URLS (plural) takes priority when set: a comma-separated list of
 # Postgres URLs shards accounts by hash(username) across them

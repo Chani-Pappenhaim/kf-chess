@@ -24,28 +24,32 @@ class _Waiting:
 
 
 class Matchmaker:
-    def __init__(self, lobby, queue, config, allocator, server_id, bus=None):
+    def __init__(self, lobby, queue, config, allocator, server_id, bus=None, region=None):
         self._lobby = lobby
         self._queue = queue
         self._config = config
         self._allocator = allocator
         self._server_id = server_id
         self._bus = bus  # None: every server in the pool is this one server
+        # Case-folded, so "US-East" and "us-east" are the same region to the
+        # queue - two deployments that mean the same place but were
+        # configured with different casing must still pair their seekers.
+        self._region = (region if region is not None else config.REGION).lower()
         self._waiting = {}  # id -> _Waiting
 
     def seek(self, session):
         seeker_id, rating = session.account.username, session.account.rating
-        match = self._queue.pop_match(rating)
+        match = self._queue.pop_match(rating, self._region)
         if match is None:
-            self._queue.add(seeker_id, rating)
+            self._queue.add(seeker_id, rating, self._region)
             self._waiting[seeker_id] = _Waiting(session)
             return
         match_id, match_rating = match
         opponent = self._waiting.pop(match_id, None)
         if opponent is None and self._bus is None:
             # theirs, and no bus to reach their server - both wait normally
-            self._queue.add(match_id, match_rating)
-            self._queue.add(seeker_id, rating)
+            self._queue.add(match_id, match_rating, self._region)
+            self._queue.add(seeker_id, rating, self._region)
             self._waiting[seeker_id] = _Waiting(session)
             return
         room_id = mint_room_id()
@@ -66,7 +70,7 @@ class Matchmaker:
 
     def cancel(self, session):
         seeker_id = session.account.username
-        self._queue.remove(seeker_id)
+        self._queue.remove(seeker_id, self._region)
         self._waiting.pop(seeker_id, None)
 
     def tick(self, dt):
@@ -76,7 +80,7 @@ class Matchmaker:
         for seeker_id, waiting in list(self._waiting.items()):
             waiting.waited += dt
             if waiting.waited >= self._config.MATCHMAKING_TIMEOUT_MS:
-                self._queue.remove(seeker_id)
+                self._queue.remove(seeker_id, self._region)
                 del self._waiting[seeker_id]
                 waiting.session.send(encode(NoOpponent()))
 

@@ -82,14 +82,14 @@ def test_a_match_from_another_server_is_handed_back_without_a_bus():
     # Server; with no bus to reach them, both sides just wait normally.
     lobby = FakeLobby()
     queue = InMemoryMatchmakingQueue(settings)
-    queue.add("ghost", 1200)
+    queue.add("ghost", 1200, settings.REGION)
     mm = Matchmaker(lobby, queue, settings, GameAllocator(["only"]), "only")
 
     mm.seek(FakeSession("dana", 1200))
 
     assert lobby.rooms == []
-    assert queue.pop_match(1200) == ("ghost", 1200)  # handed back
-    assert queue.pop_match(1200) == ("dana", 1200)   # this seeker also waits
+    assert queue.pop_match(1200, settings.REGION) == ("ghost", 1200)  # handed back
+    assert queue.pop_match(1200, settings.REGION) == ("dana", 1200)   # this seeker also waits
 
 
 def test_a_cross_server_match_seats_one_side_and_redirects_the_other():
@@ -151,3 +151,35 @@ def test_a_cancelled_seeker_leaves_the_queue():
     mm.cancel(gone)
     mm.seek(FakeSession("yossi", 1200))
     assert lobby.rooms == []  # nobody left to match the newcomer with
+
+
+def test_region_is_case_folded_so_differently_cased_config_still_matches():
+    # A region string is config, typed by a human per deployment - "US-East"
+    # and "us-east" must be treated as the same region, not two - proven here
+    # across two servers, exactly like the cross-server test above.
+    queue = InMemoryMatchmakingQueue(settings)
+    broker = {}
+    allocator = GameAllocator(["a", "b"])
+    lobby_a, lobby_b = FakeLobby(), FakeLobby()
+    mm_a = Matchmaker(lobby_a, queue, settings, allocator, "a", InMemoryPubSub(broker), region="US-East")
+    mm_b = Matchmaker(lobby_b, queue, settings, allocator, "b", InMemoryPubSub(broker), region="us-east")
+
+    mm_b.seek(FakeSession("ghost", 1200))
+    mm_a.seek(FakeSession("dana", 1200))
+    mm_a.tick(1)
+    mm_b.tick(1)
+
+    assert len(lobby_a.rooms) + len(lobby_b.rooms) == 1  # matched despite differing case
+
+
+def test_seekers_in_different_regions_never_pair():
+    queue = InMemoryMatchmakingQueue(settings)
+    allocator = GameAllocator(["only"])
+    lobby_eu, lobby_us = FakeLobby(), FakeLobby()
+    mm_eu = Matchmaker(lobby_eu, queue, settings, allocator, "only", region="eu")
+    mm_us = Matchmaker(lobby_us, queue, settings, allocator, "only", region="us")
+
+    mm_eu.seek(FakeSession("dana", 1200))
+    mm_us.seek(FakeSession("yossi", 1200))  # same rating, different region
+
+    assert lobby_eu.rooms == [] and lobby_us.rooms == []

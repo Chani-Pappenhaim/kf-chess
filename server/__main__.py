@@ -103,7 +103,7 @@ def build_service(config=settings, store=None, tokens=None, queue=None, bus=None
         snapshots=snapshots,
         rehydrate=lambda room_id, snap: build_room(room_id, config, results, snapshots, snap),
     )
-    matchmaker = Matchmaker(lobby, matchmaking_queue, config, allocator, config.SERVER_ID, bus)
+    matchmaker = Matchmaker(lobby, matchmaking_queue, config, allocator, config.SERVER_ID, bus, config.REGION)
     return outbox, GameService(lobby, matchmaker, session_tokens, config)
 
 
