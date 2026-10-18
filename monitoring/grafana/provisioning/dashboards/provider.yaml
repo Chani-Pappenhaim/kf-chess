@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: kfchess
+    folder: KungFu Chess
+    type: file
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

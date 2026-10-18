@@ -2,11 +2,21 @@
 # per client, so it scales on connection count - not exposed as a metric yet,
 # so this HPA falls back to CPU as a starting point. A plain TCP probe stands
 # in for health, since the gateway speaks WebSocket only, no HTTP.
+#
+# type: LoadBalancer (not the default ClusterIP) is the actual "Load Balancer"
+# component from the design docs: it gives clients one public address that
+# spreads connections across every replica and stops sending to one that
+# fails its probe above. On a real cloud this provisions an external LB; on a
+# local cluster (k3s/minikube/kind) it needs MetalLB (or the distro's own
+# tunnel, e.g. `minikube tunnel`) to actually assign an EXTERNAL-IP - without
+# either, the Service still load-balances *inside* the cluster, it just has
+# no address reachable from outside it.
 apiVersion: v1
 kind: Service
 metadata:
   name: ws-gateway
 spec:
+  type: LoadBalancer
   selector:
     app: ws-gateway
   ports:

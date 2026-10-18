@@ -1,0 +1,31 @@
+# Results Worker: drains server/results_queue.py (Kafka) and applies the
+# rating/history writes server/ratings.py and server/history.py used to make
+# in-line on a Game Server's own event loop. Stateless (all state is in Kafka
+# and the databases), so it scales by cloning like any other worker - the
+# only reason for more than one replica is throughput, not correctness, since
+# each message still only needs to be applied once.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: results-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: results-worker
+  template:
+    metadata:
+      labels:
+        app: results-worker
+    spec:
+      containers:
+        - name: results-worker
+          image: kfchess-server:latest
+          command: ["python", "-m", "server.results_worker"]
+          envFrom:
+            - configMapRef:
+                name: kfchess-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"

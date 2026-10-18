@@ -1,10 +1,18 @@
 # API Gateway: stateless HTTP (login, health, metrics). Scales freely on CPU
 # like any ordinary web service - it holds nothing between requests.
+#
+# type: LoadBalancer for the same reason as ws-gateway.yaml: one public
+# address in front of every replica, unhealthy ones dropped automatically.
+# Kept as its own Service (not merged with ws-gateway behind one Ingress)
+# because they speak different protocols on different ports - plain HTTP here,
+# a WebSocket upgrade there - and an Ingress is for HTTP host/path routing,
+# not for picking between two protocols.
 apiVersion: v1
 kind: Service
 metadata:
   name: api-gateway
 spec:
+  type: LoadBalancer
   selector:
     app: api-gateway
   ports:

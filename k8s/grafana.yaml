@@ -1,0 +1,124 @@
+# Grafana: a dashboard over the Prometheus that prometheus-adapter.yaml
+# already deploys. That file's Prometheus Service is the only thing this one
+# depends on - Grafana itself feeds nothing back into the HPA pipeline, it is
+# purely for a person to look at.
+#
+# Both the datasource and the one dashboard are provisioned from ConfigMaps,
+# so `kubectl apply -f k8s/` leaves a working "active rooms over time" panel
+# with no manual click-ops in the UI afterward.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+data:
+  prometheus.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus:9090
+        isDefault: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-provider
+data:
+  provider.yaml: |
+    apiVersion: 1
+    providers:
+      - name: kfchess
+        folder: KungFu Chess
+        type: file
+        options:
+          path: /etc/grafana/provisioning/dashboards/json
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-active-rooms
+data:
+  active-rooms.json: |
+    {
+      "title": "KungFu Chess - Active Rooms",
+      "schemaVersion": 39,
+      "timezone": "browser",
+      "refresh": "5s",
+      "panels": [
+        {
+          "id": 1,
+          "title": "Active rooms (fleet-wide)",
+          "type": "timeseries",
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [
+            {"expr": "sum(active_rooms)", "legendFormat": "active_rooms"}
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Active rooms per shard",
+          "type": "timeseries",
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 10},
+          "datasource": {"type": "prometheus", "uid": "Prometheus"},
+          "targets": [
+            {"expr": "active_rooms", "legendFormat": "{{pod}}"}
+          ]
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+spec:
+  type: LoadBalancer  # one address to open the dashboard from, same reasoning as the gateways
+  selector:
+    app: grafana
+  ports:
+    - port: 3000
+      targetPort: 3000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_AUTH_ANONYMOUS_ENABLED  # a school-project dashboard, not a secured deployment
+              value: "true"
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: "Viewer"
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboard-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboard-json
+              mountPath: /etc/grafana/provisioning/dashboards/json
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboard-provider
+          configMap:
+            name: grafana-dashboard-provider
+        - name: dashboard-json
+          configMap:
+            name: grafana-dashboard-active-rooms

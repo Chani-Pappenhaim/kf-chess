@@ -8,6 +8,12 @@
 # itself; a fixed replica count is assumed until the Gateway can discover the
 # live pool dynamically (e.g. from the Kubernetes API) instead of reading it
 # from config once at startup.
+#
+# TLS (wss://) is opt-in and off here (see tls.py, config/settings.py). A
+# real deployment would set KF_TLS_CERT_FILE/KF_TLS_KEY_FILE on api-gateway
+# and ws-gateway only (TLS terminates at the edge - see server/ws_gateway.py),
+# pointing at a Secret populated by something like cert-manager rather than
+# the local dev cert scripts/generate_dev_cert.py writes.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -15,7 +21,14 @@ metadata:
 data:
   KF_DISTRIBUTED: "1"
   KF_REDIS_URL: "redis://redis:6379"
-  KF_DATABASE_URL: "postgresql://kfchess:kfchess@postgres:5432/kfchess"
+  # KF_DATABASE_URL (singular) is match history's one store - unsharded, so it
+  # lives on shard 0. KF_DATABASE_URLS (plural) is what shards accounts
+  # (accounts/sharded_store.py) by hash(username) across both pods of the
+  # postgres StatefulSet (postgres.yaml).
+  KF_DATABASE_URL: "postgresql://kfchess:kfchess@postgres-0.postgres:5432/kfchess"
+  KF_DATABASE_URLS: "postgresql://kfchess:kfchess@postgres-0.postgres:5432/kfchess,postgresql://kfchess:kfchess@postgres-1.postgres:5432/kfchess"
+  KF_KAFKA_URL: "kafka:9092"
+  KF_REGION: "local"
   KF_GAME_SERVERS: "game-server-0=ws://game-server-0.game-server:8765,game-server-1=ws://game-server-1.game-server:8765"
   KF_GATEWAY_HOST: "0.0.0.0"
   KF_GATEWAY_PORT: "8760"

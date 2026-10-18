@@ -1,0 +1,18 @@
+{
+  "title": "KungFu Chess - Active Rooms",
+  "schemaVersion": 39,
+  "timezone": "browser",
+  "refresh": "5s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Active rooms (fleet-wide)",
+      "type": "timeseries",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "prometheus", "uid": "Prometheus"},
+      "targets": [
+        {"expr": "sum(active_rooms)", "legendFormat": "active_rooms"}
+      ]
+    }
+  ]
+}

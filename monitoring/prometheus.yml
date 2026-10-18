@@ -1,0 +1,9 @@
+# Local (docker-compose) twin of k8s/prometheus-adapter.yaml's scrape config -
+# same target endpoint, but pointed at the single `server` container by
+# service name instead of Kubernetes pod discovery, since compose has no
+# equivalent of kubernetes_sd_configs.
+scrape_configs:
+  - job_name: kfchess-server
+    metrics_path: /metrics/prometheus
+    static_configs:
+      - targets: ["server:8766"]

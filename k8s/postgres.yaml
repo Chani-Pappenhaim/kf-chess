@@ -1,6 +1,12 @@
-# PostgreSQL: accounts and ratings. One instance for this exercise; the
-# migration path to a distributed SQL engine (CockroachDB/Spanner) at the far
-# edge of scale is a config change, not a rewrite - see Server_Design.md.
+# PostgreSQL: accounts (sharded by hash(username), accounts/sharded_store.py)
+# and match history (unsharded, lives on shard 0). Two replicas over a
+# headless Service - the same shape as game-server.yaml's shards, since a
+# StatefulSet + headless Service is what gives each replica a stable,
+# individually-addressable name (postgres-0, postgres-1) instead of one VIP
+# load-balancing across interchangeable pods, which sharded data can never be.
+# The migration path to a distributed SQL engine (CockroachDB/Spanner) at the
+# far edge of scale is a config change from here, not a rewrite - see
+# Server_Design.md.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -16,6 +22,7 @@ kind: Service
 metadata:
   name: postgres
 spec:
+  clusterIP: None  # headless: DNS resolves straight to each pod, not one VIP
   selector:
     app: postgres
   ports:
@@ -27,7 +34,7 @@ metadata:
   name: postgres
 spec:
   serviceName: postgres
-  replicas: 1
+  replicas: 2  # must match the shard count in KF_DATABASE_URLS (kfchess-config)
   selector:
     matchLabels:
       app: postgres
