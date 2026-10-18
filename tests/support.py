@@ -31,9 +31,14 @@ class FakeHistoryStore:
     """An in-memory HistoryStore, so server tests need no SQLite file."""
 
     def __init__(self):
-        self._games = []  # newest first
+        self._games = []       # newest first
+        self._seen_ids = set()  # mirrors the real stores' UNIQUE(result_id) dedup
 
-    def record(self, winner, loser, reason, ended_at):
+    def record(self, winner, loser, reason, ended_at, result_id=None):
+        if result_id is not None:
+            if result_id in self._seen_ids:
+                return
+            self._seen_ids.add(result_id)
         self._games.insert(0, {"winner": winner, "loser": loser, "reason": reason, "ended_at": ended_at})
 
     def recent(self, username, limit):

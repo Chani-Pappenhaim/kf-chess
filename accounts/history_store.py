@@ -4,27 +4,37 @@ wide-column store at real scale (see docs/scale-architecture.md's Part 1).
 
 Not the live game (that never touches a database - see GameEngine/Room); only
 the one row a game leaves behind once GameEnded fires.
+
+`record` takes an idempotency key (`result_id`) so a message redelivered by
+the at-least-once results queue (`server/results_worker.py`) inserts the same
+row only once instead of duplicating it - a plain INSERT has no way to tell
+"the same game, told twice" from "two different games with the same score."
+Callers with nothing of their own to dedupe against (direct/local use, most
+existing tests) can leave it out; the store mints one itself so the column
+is never NULL.
 """
 from __future__ import annotations
 
 import sqlite3
 import threading
+import uuid
 from typing import Protocol, runtime_checkable
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS games (
-    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-    winner   TEXT NOT NULL,
-    loser    TEXT NOT NULL,
-    reason   TEXT,
-    ended_at INTEGER NOT NULL
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    result_id TEXT UNIQUE NOT NULL,
+    winner    TEXT NOT NULL,
+    loser     TEXT NOT NULL,
+    reason    TEXT,
+    ended_at  INTEGER NOT NULL
 )
 """
 
 
 @runtime_checkable
 class HistoryStore(Protocol):
-    def record(self, winner, loser, reason, ended_at) -> None:
+    def record(self, winner, loser, reason, ended_at, result_id=None) -> None:
         ...
 
     def recent(self, username, limit) -> tuple:
@@ -48,11 +58,12 @@ class SqliteHistoryStore:
             self._db.execute(_SCHEMA)
             self._db.commit()
 
-    def record(self, winner, loser, reason, ended_at):
+    def record(self, winner, loser, reason, ended_at, result_id=None):
         with self._lock:
             self._db.execute(
-                "INSERT INTO games (winner, loser, reason, ended_at) VALUES (?, ?, ?, ?)",
-                (winner, loser, reason, ended_at),
+                "INSERT OR IGNORE INTO games (result_id, winner, loser, reason, ended_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (result_id or str(uuid.uuid4()), winner, loser, reason, ended_at),
             )
             self._db.commit()
 
@@ -77,11 +88,12 @@ class PostgresHistoryStore:  # pragma: no cover - db shell, exercised by running
                 "INTEGER PRIMARY KEY", "SERIAL PRIMARY KEY"
             ))
 
-    def record(self, winner, loser, reason, ended_at):
+    def record(self, winner, loser, reason, ended_at, result_id=None):
         with self._lock:
             self._db.execute(
-                "INSERT INTO games (winner, loser, reason, ended_at) VALUES (%s, %s, %s, %s)",
-                (winner, loser, reason, ended_at),
+                "INSERT INTO games (result_id, winner, loser, reason, ended_at) "
+                "VALUES (%s, %s, %s, %s, %s) ON CONFLICT (result_id) DO NOTHING",
+                (result_id or str(uuid.uuid4()), winner, loser, reason, ended_at),
             )
 
     def recent(self, username, limit):

@@ -60,6 +60,32 @@ def test_a_forfeit_reason_is_kept():
     assert db.recent("dana", 10)[0]["reason"] == "forfeit"
 
 
+def test_a_repeated_result_id_is_not_recorded_twice():
+    # The idempotency guarantee server/results_worker.py relies on: the same
+    # result_id (a redelivered at-least-once message) must not duplicate the row.
+    db = store()
+    db.record("dana", "yossi", None, 1000, result_id="game-1")
+    db.record("dana", "yossi", None, 1000, result_id="game-1")
+    assert len(db.recent("dana", 10)) == 1
+
+
+def test_two_different_result_ids_are_both_recorded():
+    db = store()
+    db.record("dana", "yossi", None, 1000, result_id="game-1")
+    db.record("dana", "yossi", None, 2000, result_id="game-2")
+    assert len(db.recent("dana", 10)) == 2
+
+
+def test_no_result_id_still_records_normally():
+    # Direct/local callers with nothing to dedupe against (no queue in front
+    # of them) can omit it - the store mints its own so the column is never
+    # NULL, and two omitted calls are still two distinct rows.
+    db = store()
+    db.record("dana", "yossi", None, 1000)
+    db.record("dana", "yossi", None, 2000)
+    assert len(db.recent("dana", 10)) == 2
+
+
 def test_concurrent_recordings_from_many_threads_all_land():
     # Same real concurrency hazard the load test found in SqliteAccountStore:
     # /history and game-end recording can both hit this from different
