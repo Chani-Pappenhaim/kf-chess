@@ -286,6 +286,32 @@ HOME_BUTTON_HEIGHT = 72
 HOME_BUTTON_GAP = 30                       # vertical space between the two buttons
 HOME_BUTTON_COLOR = (210, 210, 210, 255)   # button fill (BGRA)
 
+# The computer opponent (bot/). It sits in a room's seat like a player, under
+# this name and rating; its games are practice and move no one's rating or
+# history. Every BOT_MOVE_INTERVAL_MS it looks at the board and picks a move -
+# off the game loop, on one of BOT_THREADS worker threads, so a slow pick
+# never stalls any room.
+COMPUTER_NAME = "Computer"
+COMPUTER_RATING = 1200
+BOT_MOVE_INTERVAL_MS = 2500       # pause after a move before looking for the next
+BOT_THREADS = 4
+
+# What taking each piece is worth to the greedy computer player. The king ends
+# the game, so taking it outweighs every other capture.
+BOT_PIECE_VALUES = {**PIECE_VALUES, "K": 1000}
+
+# The computer asks Gemini for its moves when GEMINI_API_KEY is set (and the
+# google-genai package is installed); without it, or whenever a request fails,
+# times out, or would break the rate limit below, it falls back to a greedy
+# player that takes the most valuable piece it can. GEMINI_REQUESTS_PER_MINUTE
+# is shared by every room on this server and defaults to the free tier's limit.
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("KF_GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_REQUESTS_PER_MINUTE = int(os.environ.get("KF_GEMINI_REQUESTS_PER_MINUTE", "10"))
+GEMINI_TIMEOUT_MS = 8000
+GEMINI_MAX_ATTEMPTS = 2       # model replies allowed per move, after a refused one
+GEMINI_THINKING_BUDGET = 0    # tokens; 0 answers fastest, as a real-time game needs
+
 # Client status lines while finding a game or when something goes wrong.
 SEARCHING_TEXT = "searching for an opponent..."
 NO_OPPONENT_MESSAGE = "no opponent found - press Play to retry"

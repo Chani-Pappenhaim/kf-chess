@@ -1,5 +1,9 @@
 """Shared test doubles. Not a test module (no test_ prefix), so pytest skips it."""
 from accounts.store import Account
+from board.loaders import load_snapshot_board
+from config import settings
+from events.bus import EventBus
+from game.composition import build_engine, build_registry
 
 
 class FakeAccountStore:
@@ -44,3 +48,13 @@ class FakeHistoryStore:
     def recent(self, username, limit):
         mine = [g for g in self._games if username in (g["winner"], g["loser"])]
         return tuple(mine[:limit])
+
+
+def engine_with(pieces, width=8, height=8):
+    """A real, started engine on a board holding just `pieces` - (token, cell)
+    pairs - for tests that need the actual rules rather than a fake."""
+    registry = build_registry(settings)
+    board = load_snapshot_board(pieces, width, height, registry, settings)
+    engine = build_engine(board, registry, settings, EventBus())
+    engine.start()
+    return engine
