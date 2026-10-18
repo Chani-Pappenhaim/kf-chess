@@ -71,3 +71,14 @@ def test_a_game_with_an_empty_seat_records_nothing():
 
     bus.publish(GameEnded(winner="w", at_ms=1000))
     assert queue.consume() == []
+
+
+def test_a_game_against_the_computer_is_not_recorded():
+    bus, queue = EventBus(), InMemoryResultsQueue()
+    registry = PlayerRegistry(settings.COLORS)
+    registry.seat(Account("dana", 1200))
+    registry.seat_computer("b", Account(settings.COMPUTER_NAME, settings.COMPUTER_RATING))
+    subscribe_history(bus, registry, queue, settings)
+    bus.publish(GameEnded(winner="w", at_ms=1000))
+    bus.publish(GameEnded(winner="b", at_ms=2000))
+    assert queue.consume() == []

@@ -208,6 +208,7 @@ REJECT_WRONG_PASSWORD = "wrong password"
 REJECT_INVALID_TOKEN = "invalid session"
 REJECT_GAME_FULL = "the game already has two players"
 REJECT_NO_SUCH_ROOM = "no room with that id"
+REJECT_UNKNOWN_COLOR = "no such colour"
 
 # Printed in the shell once the server answers a login, so a player knows whether
 # a fresh account was made or a known one was recognised.

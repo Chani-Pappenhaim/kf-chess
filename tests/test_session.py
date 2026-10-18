@@ -7,6 +7,7 @@ from protocol.messages import (
     CreateRoom,
     JoinRoom,
     MoveRequest,
+    PlayComputer,
     Rejected,
     SeekGame,
     decode,
@@ -26,6 +27,11 @@ class FakeRoom:
         self.id = room_id
         self.joined = []
         self.left = []
+        self.computer = None
+
+    def add_computer(self, color):
+        self.computer = color
+        return True
 
     def join(self, session):
         self.joined.append(session)
@@ -60,11 +66,21 @@ class FakeMatchmaker:
         self.cancelled.append(session)
 
 
-def session(lobby=None, matchmaker=None):
+class FixedChoice:
+    """Stands in for the random colour draw: always picks the given index."""
+
+    def __init__(self, index):
+        self._index = index
+
+    def choice(self, options):
+        return options[self._index]
+
+
+def session(lobby=None, matchmaker=None, rng=None):
     sent = []
     lobby = lobby or FakeLobby()
     matchmaker = matchmaker or FakeMatchmaker()
-    client = ClientSession(Account("dana", 1200), lobby, matchmaker, sent.append, settings)
+    client = ClientSession(Account("dana", 1200), lobby, matchmaker, sent.append, settings, rng)
     return client, lobby, matchmaker, sent
 
 
@@ -152,3 +168,42 @@ def test_departing_from_a_room_leaves_the_room():
     client.enter_room(room, "w", object(), 8)
     client.depart()
     assert room.left == [client]
+
+
+def test_playing_the_computer_as_white_seats_the_computer_on_black_first():
+    client, lobby, _mm, _sent = session()
+    client.handle(encode(PlayComputer("w")))
+    room = lobby.created[0]
+    assert room.computer == "b"
+    assert room.joined == [client]
+
+
+def test_playing_the_computer_as_black_seats_the_computer_on_white():
+    client, lobby, _mm, _sent = session()
+    client.handle(encode(PlayComputer("b")))
+    assert lobby.created[0].computer == "w"
+
+
+def test_a_random_colour_is_drawn_on_the_server():
+    client, lobby, _mm, _sent = session(rng=FixedChoice(1))   # draws Black
+    client.handle(encode(PlayComputer()))
+    assert lobby.created[0].computer == "w"
+
+
+def test_playing_the_computer_honours_an_id_routed_by_the_gateway():
+    client, lobby, _mm, _sent = session()
+    client.handle(encode(PlayComputer("w", "chosen")))
+    assert lobby.created[0].id == "chosen"
+
+
+def test_an_unknown_colour_is_refused_and_opens_no_room():
+    client, lobby, _mm, sent = session()
+    client.handle(encode(PlayComputer("green")))
+    assert decode(sent[-1]) == Rejected(settings.REJECT_UNKNOWN_COLOR)
+    assert lobby.created == []
+
+
+def test_a_session_draws_colours_from_a_real_random_source_by_default():
+    client, lobby, _mm, _sent = session()
+    client.handle(encode(PlayComputer()))
+    assert lobby.created[0].computer in settings.COLORS

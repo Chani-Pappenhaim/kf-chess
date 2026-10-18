@@ -42,6 +42,10 @@ def _apply(registry, queue, config, winner, loser):
     # opponent to rate against, so nothing moves.
     if winner_name is None or loser_name is None:
         return
+    # A game against the computer is practice: it has no rating to win from
+    # or lose to, so no one's rating moves.
+    if registry.is_computer(winner) or registry.is_computer(loser):
+        return
     new_winner, new_loser = updated(
         registry.ratings()[winner], registry.ratings()[loser], config.ELO_K_FACTOR
     )

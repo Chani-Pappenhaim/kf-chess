@@ -30,6 +30,10 @@ def subscribe_history(bus, registry, queue, config):
         # opponent to record a result against.
         if winner is None or loser is None:
             return
+        # Practice against the computer is not part of a player's record -
+        # and "Computer" is no account the history could name.
+        if registry.is_computer(winner_color) or registry.is_computer(loser_color):
+            return
         queue.publish({
             "kind": "history",
             "winner": winner, "loser": loser,

@@ -1,3 +1,5 @@
+import pytest
+
 from accounts.store import Account
 from config import settings
 from protocol.messages import RoomEntered, decode
@@ -237,8 +239,8 @@ def test_a_snapshot_carries_piece_positions_and_seats():
     snapshot = snapshots.saved["7"]
     assert snapshot["pieces"] == [["wK", [0, 0]]]
     assert snapshot["players"] == {
-        "w": {"username": "dana", "rating": 1300},
-        "b": {"username": "yossi", "rating": 1100},
+        "w": {"username": "dana", "rating": 1300, "computer": False},
+        "b": {"username": "yossi", "rating": 1100, "computer": False},
     }
 
 
@@ -318,3 +320,148 @@ def test_the_clock_alone_changing_does_not_count_as_dirty():
     r.tick(settings.STATE_BROADCAST_MS)
     r.tick(settings.STATE_BROADCAST_MS)
     assert white.sent == []
+
+
+# -- a seat held by the computer -------------------------------------------
+
+class FakeComputer:
+    """Records the time it was given, as a ComputerPlayer would spend it."""
+
+    def __init__(self, color):
+        self.color = color
+        self.ticked = 0
+
+    def tick(self, dt):
+        self.ticked += dt
+
+
+def computer_room(registry=None):
+    built = {}
+
+    def factory(color):
+        built[color] = FakeComputer(color)
+        return built[color]
+
+    engine = FakeEngine()
+    registry = registry or PlayerRegistry(settings.COLORS)
+    return Room("7", engine, registry, 8, settings, computer_factory=factory), engine, built
+
+
+def test_the_computer_takes_the_colour_it_is_given_and_the_human_the_other():
+    r, _, _ = computer_room()
+    assert r.add_computer("w")
+    human = FakeSession("dana")
+    r.join(human)
+    assert human.color == "b"
+
+
+def test_the_computer_is_shown_under_its_configured_name_and_rating():
+    r, _, _ = computer_room()
+    r.add_computer("b")
+    human = FakeSession("dana")
+    r.join(human)
+    model = last_state(human)
+    assert model.players["b"] == settings.COMPUTER_NAME
+    assert model.ratings["b"] == settings.COMPUTER_RATING
+
+
+def test_a_human_joining_the_computer_starts_the_game():
+    r, engine, _ = computer_room()
+    r.add_computer("b")
+    r.join(FakeSession("dana"))
+    assert engine.started
+
+
+def test_the_computer_cannot_take_a_seat_already_held():
+    r, _, built = computer_room()
+    r.join(FakeSession("dana"))           # takes White
+    assert not r.add_computer("w")
+    assert "w" not in built
+    assert r.add_computer("b")
+
+
+def test_a_room_built_without_a_computer_player_refuses_to_seat_one():
+    r, _ = room()
+    with pytest.raises(RuntimeError):
+        r.add_computer("b")
+
+
+def test_the_computer_plays_only_once_the_game_is_on():
+    r, _, built = computer_room()
+    r.add_computer("b")
+    r.tick(100)
+    assert built["b"].ticked == 0     # no human yet: nothing to play against
+    r.join(FakeSession("dana"))
+    r.tick(100)
+    assert built["b"].ticked == 100
+
+
+def test_the_computer_waits_while_its_opponent_is_away():
+    r, _, built = computer_room()
+    r.add_computer("b")
+    human = FakeSession("dana")
+    r.join(human)
+    r.leave(human)
+    r.tick(100)
+    assert built["b"].ticked == 0
+
+
+def test_a_room_whose_human_left_is_kept_until_the_grace_runs_out():
+    r, engine, _ = computer_room()
+    r.add_computer("b")
+    human = FakeSession("dana")
+    r.join(human)
+    r.leave(human)
+    assert not r.is_empty
+    r.tick(settings.DISCONNECT_GRACE_MS)
+    assert engine.conceded == ("b", settings.GAME_END_FORFEIT)
+    assert r.is_empty
+
+
+def test_a_human_who_rejoins_the_computer_in_time_keeps_their_seat():
+    r, engine, built = computer_room()
+    r.add_computer("b")
+    first = FakeSession("dana")
+    r.join(first)
+    r.leave(first)
+    back = FakeSession("dana")
+    r.join(back)
+    assert back.color == "w"
+    r.tick(settings.DISCONNECT_GRACE_MS)
+    assert engine.conceded is None
+    assert built["b"].ticked == settings.DISCONNECT_GRACE_MS
+
+
+def test_a_human_named_like_the_computer_is_not_handed_its_seat():
+    r, _, _ = computer_room()
+    r.add_computer("b")
+    r.join(FakeSession("dana"))
+    impostor = FakeSession(settings.COMPUTER_NAME)
+    r.join(impostor)
+    assert impostor.color is None      # a viewer, not the computer's seat
+
+
+def test_the_snapshot_marks_the_computer_seat():
+    r, _, _ = computer_room()
+    r.add_computer("b")
+    r.join(FakeSession("dana"))
+    players = r.snapshot()["players"]
+    assert players["b"]["computer"] is True
+    assert players["w"]["computer"] is False
+
+
+def test_a_rehydrated_room_gets_its_computer_player_back():
+    registry = PlayerRegistry(settings.COLORS)
+    registry.restore({
+        "w": {"username": "dana", "rating": 1200},
+        "b": {"username": settings.COMPUTER_NAME, "rating": 1200, "computer": True},
+    })
+    _, _, built = computer_room(registry)
+    assert set(built) == {"b"}
+
+
+def test_a_snapshot_seating_the_computer_needs_a_room_that_can_build_one():
+    registry = PlayerRegistry(settings.COLORS)
+    registry.restore({"b": {"username": settings.COMPUTER_NAME, "rating": 1200, "computer": True}})
+    with pytest.raises(RuntimeError):
+        Room("7", FakeEngine(), registry, 8, settings)

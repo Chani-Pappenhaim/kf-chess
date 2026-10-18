@@ -11,6 +11,7 @@ import asyncio
 
 from accounts.factory import account_store_for, history_store_for
 from board.loaders import load_csv_board, load_snapshot_board
+from bot.factory import build_computer_players
 from config import settings
 from events.bus import EventBus
 from game.composition import build_engine, build_registry
@@ -49,7 +50,7 @@ def load_board(config, snapshot=None):
         return load_csv_board(handle.read().splitlines(), registry, config), registry
 
 
-def build_room(room_id, config, results_queue, room_snapshots=None, snapshot=None):
+def build_room(room_id, config, results_queue, room_snapshots=None, snapshot=None, computers=None):
     """One room's whole graph: a fresh board and engine, a registry to seat its
     two players, and this room's own broadcaster, rating, and history
     subscribers on its own bus - so nothing it publishes reaches any other room.
@@ -58,6 +59,8 @@ def build_room(room_id, config, results_queue, room_snapshots=None, snapshot=Non
     instead of a fresh game - `Lobby.room()`'s rehydration path, not normal
     creation. `room_snapshots` is where this room mirrors its own position to
     as it plays, regardless of whether it started fresh or rehydrated.
+    `computers` (bot/factory.py's ComputerPlayers) makes the computer player
+    for a room that seats one; without it, the room seats only people.
 
     Ratings and history no longer take a store directly: both publish onto
     `results_queue` and `server/results_worker.py` durably applies the writes
@@ -69,7 +72,8 @@ def build_room(room_id, config, results_queue, room_snapshots=None, snapshot=Non
     players = PlayerRegistry(config.COLORS)
     if snapshot is not None:
         players.restore(snapshot["players"])
-    room = Room(room_id, engine, players, board.height, config, room_snapshots)
+    computer_factory = (lambda color: computers.player(engine, color)) if computers else None
+    room = Room(room_id, engine, players, board.height, config, room_snapshots, computer_factory)
     subscribe_broadcast(bus, room.broadcast)
     subscribe_ratings(bus, players, results_queue, config)
     subscribe_history(bus, players, results_queue, config)
@@ -77,12 +81,12 @@ def build_room(room_id, config, results_queue, room_snapshots=None, snapshot=Non
 
 
 def build_service(config=settings, store=None, tokens=None, queue=None, bus=None,
-                   active_rooms=None, results_queue=None, room_snapshots=None):
+                   active_rooms=None, results_queue=None, room_snapshots=None, computers=None):
     """The server, wired to host many games. Returns the outbox (to drain) and
     the service the socket drives.
 
     `store`, `tokens`, `queue`, `bus`, `active_rooms`, `results_queue`, and
-    `room_snapshots` are injectable so a test can pass fakes instead of real
+    `room_snapshots` (and `computers`, the computer opponent) are injectable so a test can pass fakes instead of real
     infrastructure; the server proper builds them from config and shares
     `store` with the API Gateway (see run()) - `results_queue` is shared with
     `server/results_worker.py` instead, a separate process, not this one.
@@ -94,14 +98,15 @@ def build_service(config=settings, store=None, tokens=None, queue=None, bus=None
     matchmaking_queue = queue or InMemoryMatchmakingQueue(config)
     snapshots = room_snapshots or InMemoryRoomSnapshots()
     results = results_queue or InMemoryResultsQueue()
+    bots = computers or build_computer_players(config)
     allocator = GameAllocator(parse_pool(config.GAME_SERVERS).keys())
     outbox = Outbox()
     lobby = Lobby(
-        lambda room_id: build_room(room_id, config, results, snapshots),
+        lambda room_id: build_room(room_id, config, results, snapshots, computers=bots),
         config.SERVER_ID,
         active_rooms or InMemoryActiveRooms(),
         snapshots=snapshots,
-        rehydrate=lambda room_id, snap: build_room(room_id, config, results, snapshots, snap),
+        rehydrate=lambda room_id, snap: build_room(room_id, config, results, snapshots, snap, bots),
     )
     matchmaker = Matchmaker(lobby, matchmaking_queue, config, allocator, config.SERVER_ID, bus, config.REGION)
     return outbox, GameService(lobby, matchmaker, session_tokens, config)

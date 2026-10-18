@@ -109,3 +109,54 @@ def test_a_restored_player_is_recognised_on_reconnect():
     registry = PlayerRegistry(COLORS)
     registry.restore({"w": {"username": "dana", "rating": 1200}})
     assert registry.seated_color("dana") == "w"
+
+
+def computer(rating=1200):
+    return Account("Computer", rating)
+
+
+def test_the_computer_is_seated_on_the_colour_it_is_given():
+    registry = PlayerRegistry(COLORS)
+    assert registry.seat_computer("b", computer())
+    assert registry.is_computer("b")
+    assert not registry.is_computer("w")
+    assert registry.names() == {"b": "Computer"}
+
+
+def test_a_human_then_takes_the_colour_the_computer_left_free():
+    registry = PlayerRegistry(COLORS)
+    registry.seat_computer("w", computer())
+    assert registry.seat(account("dana")) == "b"
+
+
+def test_the_computer_takes_no_unknown_or_taken_colour():
+    registry = PlayerRegistry(COLORS)
+    registry.seat(account("dana"))
+    assert not registry.seat_computer("w", computer())
+    assert not registry.seat_computer("x", computer())
+    assert registry.computer_colors() == ()
+
+
+def test_the_computer_seat_is_never_a_reconnecting_humans():
+    registry = PlayerRegistry(COLORS)
+    registry.seat_computer("b", computer())
+    assert registry.seated_color("Computer") is None
+    assert registry.seat(account("Computer")) == "w"   # a namesake is just a player
+
+
+def test_freeing_the_computer_seat_forgets_it_was_the_computers():
+    registry = PlayerRegistry(COLORS)
+    registry.seat_computer("b", computer())
+    registry.leave("b")
+    assert not registry.is_computer("b")
+    assert registry.seat(account("dana")) == "w"
+
+
+def test_restore_brings_back_which_seat_is_the_computers():
+    registry = PlayerRegistry(COLORS)
+    registry.restore({
+        "w": {"username": "dana", "rating": 1200},          # an older snapshot: no flag
+        "b": {"username": "Computer", "rating": 1200, "computer": True},
+    })
+    assert registry.computer_colors() == ("b",)
+    assert registry.seated_color("dana") == "w"

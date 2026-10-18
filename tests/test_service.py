@@ -1,6 +1,13 @@
+from concurrent.futures import Future
+
 from accounts.store import Account
+from bot.factory import ComputerPlayers
+from bot.strategy import GreedyStrategy
 from config import settings
-from protocol.messages import Connect, MoveRequest, Rejected, Welcome, decode, encode
+from protocol.messages import (
+    Connect, MoveRequest, PlayComputer, Rejected, RoomEntered, StateUpdate, Welcome, decode, encode,
+)
+from protocol.state import decode_model
 from server.__main__ import build_room, build_service
 from server.results_queue import InMemoryResultsQueue
 from server.service import GameService
@@ -89,6 +96,35 @@ def test_the_factory_rehydrates_a_real_room_from_a_saved_snapshot():
     reconnected = _FakeMember("dana")
     room.join(reconnected)
     assert reconnected.color == "w"  # recognised from the restored registry, not seated fresh
+
+
+class _InlineExecutor:
+    """Runs the computer's thinking at once, on the calling thread."""
+
+    def submit(self, fn, *args):
+        future = Future()
+        future.set_result(fn(*args))
+        return future
+
+
+def test_playing_the_computer_seats_it_opposite_and_it_moves_on_its_own():
+    # The whole path on the real graph: PlayComputer -> a fresh room with the
+    # computer in Black's seat -> the game starts -> the computer moves.
+    tokens = InMemoryTokenStore()
+    computers = ComputerPlayers(GreedyStrategy(settings.BOT_PIECE_VALUES), _InlineExecutor(), settings)
+    _outbox, game = build_service(settings, store=FakeAccountStore(settings.STARTING_RATING),
+                                  tokens=tokens, results_queue=InMemoryResultsQueue(),
+                                  computers=computers)
+    lines = []
+    session, _ = game.admit(encode(Connect(tokens.issue(Account("dana", 1200)))), lines.append)
+    session.handle(encode(PlayComputer("w")))
+    entered = [m for m in map(decode, lines) if isinstance(m, RoomEntered)]
+    assert entered[0].color == "w"
+    for _ in range(3):
+        game.tick(settings.BOT_MOVE_INTERVAL_MS)
+    states = [decode_model(m.state) for m in map(decode, lines) if isinstance(m, StateUpdate)]
+    assert any(piece.token[0] == "b" and piece.state != "idle"
+               for piece in states[-1].pieces)
 
 
 # -- the coordinator's own duties, over fakes -------------------------------

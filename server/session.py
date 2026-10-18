@@ -2,7 +2,7 @@
 
 A small state machine behind the socket's single `handle(text)`. It begins on
 the home screen, where the only things it understands are "find me a game"
-(Play), "open a room", and "join this room". The moment it enters a room it hands
+(Play), "open a room", "join this room", and "let me play the computer". The moment it enters a room it hands
 the wheel to a CommandHandler bound to that room's game, and from then on every
 line is a move, a jump, or a hint for that room and nothing else.
 
@@ -11,10 +11,13 @@ lives it was leading: a seeker still queued, or a member of a room.
 """
 from __future__ import annotations
 
+import random
+
 from protocol.errors import ProtocolError
 from protocol.messages import (
     CreateRoom,
     JoinRoom,
+    PlayComputer,
     Rejected,
     SeekGame,
     decode,
@@ -24,12 +27,13 @@ from server.handler import CommandHandler
 
 
 class ClientSession:
-    def __init__(self, account, lobby, matchmaker, send, config):
+    def __init__(self, account, lobby, matchmaker, send, config, rng=None):
         self._account = account
         self._lobby = lobby
         self._matchmaker = matchmaker
         self._send = send
         self._config = config
+        self._rng = rng or random.Random()  # picks the colour when asked to
         self._room = None
         self._color = None
         self._handler = None  # a CommandHandler once in a room
@@ -37,6 +41,7 @@ class ClientSession:
             SeekGame: self._seek,
             CreateRoom: self._create,
             JoinRoom: self._join,
+            PlayComputer: self._play_computer,
         }
 
     @property
@@ -90,4 +95,17 @@ class ClientSession:
         if room is None:
             self._send(encode(Rejected(self._config.REJECT_NO_SUCH_ROOM)))
             return
+        room.join(self)
+
+    def _play_computer(self, message):
+        """Open a room with the computer in the seat this player did not ask
+        for, then join it - landing in the one seat left. The colour is drawn
+        here, on the server, when the player leaves it to chance."""
+        colors = self._config.COLORS
+        color = message.color or self._rng.choice(colors)
+        if color not in colors:
+            self._send(encode(Rejected(self._config.REJECT_UNKNOWN_COLOR)))
+            return
+        room = self._lobby.create(message.room_id or None)
+        room.add_computer(next(other for other in colors if other != color))
         room.join(self)

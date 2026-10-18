@@ -12,6 +12,13 @@ disconnects mid-game the room does not resign at once: it counts DISCONNECT_GRAC
 down, in view of the remaining player, and only then concedes the game in the
 leaver's name - long enough that a blink of a connection is not a lost game.
 
+One seat may be the computer's instead (add_computer): a ComputerPlayer, built
+by the injected `computer_factory`, that the room ticks alongside its engine once
+the game is on. It plays only while the human is here - during a disconnect
+countdown it waits, so a dropped connection does not cost a free run of moves -
+and a room whose human has left is kept, not emptied, until that countdown
+ends, so the human can rejoin by the room's id like any other player.
+
 Time is handed in through tick(dt); the room counts the grace period from it, so
 the server clock stays the only clock here too.
 
@@ -24,12 +31,14 @@ restores.
 """
 from __future__ import annotations
 
+from accounts.store import Account
 from protocol.messages import RoomEntered, StateUpdate, encode
 from server.broadcast import broadcast_state, encode_state
 
 
 class Room:
-    def __init__(self, room_id, engine, registry, board_height, config, snapshots=None):
+    def __init__(self, room_id, engine, registry, board_height, config, snapshots=None,
+                 computer_factory=None):
         self._id = room_id
         self._engine = engine
         self._registry = registry
@@ -43,6 +52,10 @@ class Room:
         self._resigning = None      # the colour that left, awaiting auto-resign
         self._since_broadcast = 0   # ms since tick() last even considered broadcasting
         self._last_broadcast = None # the last state payload actually sent (dirty check)
+        self._new_computer = computer_factory  # colour -> ComputerPlayer
+        # A registry restored from a snapshot may already seat the computer;
+        # it gets its player back here, the same as one added fresh.
+        self._computers = {color: self._build_computer(color) for color in registry.computer_colors()}
 
     @property
     def id(self):
@@ -50,8 +63,29 @@ class Room:
 
     @property
     def is_empty(self):
-        """No one left in the room, so the lobby may forget it."""
-        return not self._members
+        """No one left in the room, so the lobby may forget it. A room counting
+        a leaver down is not empty yet even with no members: against the
+        computer, the leaver is the only person there is, and must still be
+        able to come back."""
+        return not self._members and self._countdown is None
+
+    def add_computer(self, color):
+        """Seat the computer player on `color`, before any human joins. False
+        when that seat cannot be its (an unknown or taken colour)."""
+        self._require_computer_factory()
+        account = Account(self._config.COMPUTER_NAME, self._config.COMPUTER_RATING)
+        if not self._registry.seat_computer(color, account):
+            return False
+        self._computers[color] = self._new_computer(color)
+        return True
+
+    def _build_computer(self, color):
+        self._require_computer_factory()
+        return self._new_computer(color)
+
+    def _require_computer_factory(self):
+        if self._new_computer is None:
+            raise RuntimeError(f"room {self._id} was built without a computer player")
 
     def join(self, session):
         """Seat `session` (White, then Black, then viewer), tell it where it
@@ -97,9 +131,13 @@ class Room:
             member.send(line)
 
     def tick(self, dt):
-        """Advance this room's game, run any resign countdown, mirror the
-        position if it's been long enough, send the state."""
+        """Advance this room's game, let the computer play, run any resign
+        countdown, mirror the position if it's been long enough, send the
+        state."""
         self._engine.wait(dt)
+        if self._started and self._countdown is None:
+            for computer in self._computers.values():
+                computer.tick(dt)
         if self._countdown is not None:
             self._countdown -= dt
             if self._countdown <= 0:
@@ -160,7 +198,12 @@ class Room:
             "width": model.width,
             "height": model.height,
             "players": {
-                color: {"username": names[color], "rating": ratings[color]} for color in names
+                color: {
+                    "username": names[color],
+                    "rating": ratings[color],
+                    "computer": self._registry.is_computer(color),
+                }
+                for color in names
             },
         }
 

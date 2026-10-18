@@ -67,3 +67,26 @@ def test_a_game_with_an_empty_seat_moves_nothing():
     bus.publish(GameEnded(winner="w", at_ms=1000))
     assert registry.ratings() == {"w": 1200}
     assert queue.consume() == []
+
+
+def vs_computer(computer_color):
+    bus, queue = EventBus(), InMemoryResultsQueue()
+    registry = PlayerRegistry(settings.COLORS)
+    registry.seat_computer(computer_color, Account(settings.COMPUTER_NAME, settings.COMPUTER_RATING))
+    registry.seat(Account("dana", 1200))
+    subscribe_ratings(bus, registry, queue, settings)
+    return bus, registry, queue
+
+
+def test_beating_the_computer_moves_no_rating():
+    bus, registry, queue = vs_computer("b")
+    bus.publish(GameEnded(winner="w", at_ms=1000))
+    assert registry.ratings()["w"] == 1200
+    assert queue.consume() == []
+
+
+def test_losing_to_the_computer_moves_no_rating():
+    bus, registry, queue = vs_computer("w")
+    bus.publish(GameEnded(winner="w", at_ms=1000))
+    assert registry.ratings()["b"] == 1200
+    assert queue.consume() == []
