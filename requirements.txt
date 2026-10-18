@@ -5,3 +5,4 @@ psycopg[binary]
 redis
 kafka-python
 cryptography
+google-genai

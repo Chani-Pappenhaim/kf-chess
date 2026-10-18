@@ -50,3 +50,6 @@ history.db
 # Self-signed dev TLS cert/key (scripts/generate_dev_cert.py) - never commit
 # a private key, even a throwaway local one.
 certs/
+
+# Local secrets (GEMINI_API_KEY for docker compose)
+.env

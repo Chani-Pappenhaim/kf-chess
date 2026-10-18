@@ -46,6 +46,15 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            # Gemini for the computer opponent, from a Secret that need not
+            # exist - without it the computer plays greedily. Create it with
+            #   kubectl create secret generic kfchess-gemini --from-literal=api-key=...
+            - name: GEMINI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kfchess-gemini
+                  key: api-key
+                  optional: true
           readinessProbe:
             httpGet:
               path: /health

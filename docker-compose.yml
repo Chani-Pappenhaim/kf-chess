@@ -41,6 +41,10 @@ services:
       KF_DATABASE_URL: "postgresql://kfchess:kfchess@postgres-shard-0:5432/kfchess"
       KF_DATABASE_URLS: "postgresql://kfchess:kfchess@postgres-shard-0:5432/kfchess,postgresql://kfchess:kfchess@postgres-shard-1:5432/kfchess"
       KF_KAFKA_URL: "kafka:9092"
+      # The computer opponent asks Gemini for its moves when this is set (put
+      # GEMINI_API_KEY=... in a .env file beside this one, never in git);
+      # left empty, it plays greedily on its own.
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
     depends_on:
       - redis
       - postgres-shard-0

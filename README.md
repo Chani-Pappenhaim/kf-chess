@@ -32,6 +32,7 @@ ui/        graphics_renderer.py   - RenderModel -> canvas via Img (+ selection h
            input_source.py        - InputTranslator (device event -> Controller)
            composition.py         - the one place the graphical UI is wired (shared)
 events/    bus.py                 - EventBus: publish/subscribe by exact event type
+bot/       player/strategy/gemini - the computer opponent: Gemini moves, greedy fallback
 audio/     player.py, cues.py     - winsound shell; one sound per event, off the bus
 gateway/   gateway.py             - GameGateway Protocol (engine and network proxy alike)
 protocol/  commands/state/events  - pure translation of what crosses the wire (no I/O)
@@ -51,7 +52,15 @@ play.py    graphical real-time entry: `python play.py`
   jump, ESC/q to quit. See [docs/UI_ARCHITECTURE.md](docs/UI_ARCHITECTURE.md).
 - **Over a network:** `python -m server` runs the authoritative game; each
   `python -m client` opens a window that plays against it, and several clients
-  share one game.
+  share one game. The home screen offers Play (a quick match), Room (create or
+  join by id) and Computer (pick White, Black or Random, then play the
+  computer).
+- **The computer opponent:** set `GEMINI_API_KEY` (a free Google AI Studio key)
+  on the server and the computer asks Gemini for its moves, at most
+  `KF_GEMINI_REQUESTS_PER_MINUTE` (default 10) across all rooms. Without a key,
+  or whenever Gemini fails, times out or is throttled, it plays greedily -
+  taking the most valuable piece in reach. Games against it are practice: no
+  rating or history changes.
 
 ## Layers and responsibilities
 
