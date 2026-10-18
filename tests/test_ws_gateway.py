@@ -1,4 +1,4 @@
-from protocol.messages import CreateRoom, JoinRoom, Rejected, RoomEntered, SeekGame, decode, encode
+from protocol.messages import CreateRoom, JoinRoom, PlayComputer, Rejected, RoomEntered, SeekGame, decode, encode
 from server.allocator import GameAllocator
 from server.ws_gateway import plan_route, room_missing
 
@@ -26,6 +26,25 @@ def test_an_already_routed_create_room_is_not_re_minted():
     first = encode(CreateRoom("chosen"))
     target, line = plan_route(CreateRoom("chosen"), first, allocator)
     assert target is None  # nothing left to decide
+    assert line == first
+
+
+def test_a_fresh_play_computer_is_minted_an_id_and_keeps_its_colour():
+    allocator = GameAllocator(["a"])
+    first = encode(PlayComputer("b"))
+    target, line = plan_route(PlayComputer("b"), first, allocator)
+    assert target == "a"
+    routed = decode(line)
+    assert isinstance(routed, PlayComputer)
+    assert routed.color == "b"
+    assert routed.room_id != ""
+
+
+def test_an_already_routed_play_computer_is_not_re_minted():
+    allocator = GameAllocator(["a"])
+    first = encode(PlayComputer("w", "chosen"))
+    target, line = plan_route(PlayComputer("w", "chosen"), first, allocator)
+    assert target is None
     assert line == first
 
 

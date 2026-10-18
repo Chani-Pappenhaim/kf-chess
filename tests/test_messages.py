@@ -16,6 +16,7 @@ from protocol.messages import (
     MESSAGE_TYPES,
     MoveRequest,
     NoOpponent,
+    PlayComputer,
     Redirected,
     Rejected,
     RoomEntered,
@@ -35,6 +36,7 @@ SAMPLES = (
     SeekGame(),
     CreateRoom(),
     JoinRoom("7"),
+    PlayComputer("b", "7"),
     Welcome(),
     Rejected("full"),
     Redirected("7"),
@@ -54,6 +56,10 @@ def test_a_message_survives_the_round_trip_unchanged(message):
 def test_every_message_kind_is_covered_by_the_samples():
     # Keeps the round-trip test honest as messages are added.
     assert {type(message) for message in SAMPLES} == set(MESSAGE_TYPES)
+
+
+def test_play_computer_defaults_to_a_random_colour_and_an_unrouted_room():
+    assert PlayComputer() == PlayComputer(color="", room_id="")
 
 
 def test_what_travels_is_text():

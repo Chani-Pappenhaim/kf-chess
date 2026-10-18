@@ -6,13 +6,14 @@ the rest of a session untouched once it is routed.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 
 from websockets.asyncio.client import connect as connect_upstream
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
 
 from config import settings
-from protocol.messages import CreateRoom, JoinRoom, Rejected, decode, encode
+from protocol.messages import CreateRoom, JoinRoom, PlayComputer, Rejected, decode, encode
 from server.allocator import GameAllocator, mint_room_id, parse_pool
 from server.rate_limit import TokenBucket
 from tls import server_context
@@ -20,14 +21,16 @@ from tls import server_context
 
 def plan_route(message, first, allocator):
     """Where a home-screen choice belongs: (target_server_id, line_to_send).
-    A JoinRoom hashes the room it names; a fresh CreateRoom is minted an id and
-    hashed the same way; anything else (SeekGame, an already-id'd CreateRoom)
-    has no target of its own yet, and stays wherever it already is."""
+    A JoinRoom hashes the room it names; a fresh CreateRoom or PlayComputer is
+    minted an id and hashed the same way, so a game against the computer is
+    placed like any other room and can be rejoined by its id after a drop;
+    anything else (SeekGame, an already-id'd room) has no target of its own
+    yet, and stays wherever it already is."""
     if isinstance(message, JoinRoom):
         return allocator.for_key(message.room_id), first
-    if isinstance(message, CreateRoom) and not message.room_id:
+    if isinstance(message, (CreateRoom, PlayComputer)) and not message.room_id:
         room_id = mint_room_id()
-        return allocator.for_key(room_id), encode(CreateRoom(room_id))
+        return allocator.for_key(room_id), encode(replace(message, room_id=room_id))
     return None, first
 
 

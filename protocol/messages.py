@@ -82,6 +82,17 @@ class JoinRoom:
     room_id: str
 
 
+@dataclass(frozen=True)
+class PlayComputer:
+    """The "Computer" button: open a new room with the server's computer
+    player in one seat and me in the other. `color` is the seat I asked for -
+    "w", "b", or "" to let the server pick one at random. `room_id` is minted
+    and routed by a Gateway exactly as for CreateRoom."""
+
+    color: str = ""
+    room_id: str = ""
+
+
 # -- server to client ------------------------------------------------------
 
 @dataclass(frozen=True)
@@ -154,6 +165,7 @@ MESSAGE_TYPES = (
     SeekGame,
     CreateRoom,
     JoinRoom,
+    PlayComputer,
     Welcome,
     Rejected,
     Redirected,
