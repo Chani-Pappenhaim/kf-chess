@@ -24,8 +24,8 @@ restores.
 """
 from __future__ import annotations
 
-from protocol.messages import RoomEntered, encode
-from server.broadcast import broadcast_state
+from protocol.messages import RoomEntered, StateUpdate, encode
+from server.broadcast import broadcast_state, encode_state
 
 
 class Room:
@@ -41,6 +41,8 @@ class Room:
         self._started = False       # whether both seats filled and the game began
         self._countdown = None      # ms left before a disconnected player resigns
         self._resigning = None      # the colour that left, awaiting auto-resign
+        self._since_broadcast = 0   # ms since tick() last even considered broadcasting
+        self._last_broadcast = None # the last state payload actually sent (dirty check)
 
     @property
     def id(self):
@@ -107,7 +109,10 @@ class Room:
             if self._since_snapshot >= self._config.ROOM_SNAPSHOT_INTERVAL_MS:
                 self._since_snapshot = 0
                 self._save_snapshot()
-        self._broadcast_state()
+        self._since_broadcast += dt
+        if self._since_broadcast >= self._config.STATE_BROADCAST_MS:
+            self._since_broadcast = 0
+            self._broadcast_if_changed()
 
     def _resign(self):
         """The grace ran out: the one who stayed wins, exactly as any game ends,
@@ -160,8 +165,42 @@ class Room:
         }
 
     def _broadcast_state(self):
+        """Send the state right now, unconditionally - for join/leave, where a
+        member needs to hear about their own change immediately rather than
+        wait for the next throttled tick."""
+        self._last_broadcast = self._state_payload()
         broadcast_state(
             self._engine, self._registry.names(), self._registry.ratings(),
             self._viewer_names(), self._countdown_seconds(), self.broadcast,
             self._config.STATE_MOVE_HISTORY_LIMIT,
         )
+
+    def _broadcast_if_changed(self):
+        """The routine per-tick broadcast: only actually sends when the
+        payload differs from the last one sent, so an idle room (nobody
+        moving) costs the network nothing between join/leave events.
+
+        Compares everything except `clock`: the clock advances every tick
+        regardless of whether anything visible changed, so including it would
+        make every tick "dirty" and defeat the whole point. Piece `progress`/
+        `cooldown_progress` are exactly what should (and do) still count -
+        while anything is actually moving or resting, those change and this
+        keeps broadcasting; the moment the board is fully idle, they stop
+        changing and so does the traffic.
+        """
+        payload = self._state_payload()
+        if self._last_broadcast is not None and _without_clock(payload) == _without_clock(self._last_broadcast):
+            return
+        self._last_broadcast = payload
+        self.broadcast(encode(StateUpdate(payload)))
+
+    def _state_payload(self):
+        return encode_state(
+            self._engine, self._registry.names(), self._registry.ratings(),
+            self._viewer_names(), self._countdown_seconds(),
+            self._config.STATE_MOVE_HISTORY_LIMIT,
+        )
+
+
+def _without_clock(payload):
+    return {key: value for key, value in payload.items() if key != "clock"}

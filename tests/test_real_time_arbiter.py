@@ -192,7 +192,7 @@ def test_slider_commits_one_cell_per_step():
     arbiter.advance_time(MD)
     assert board.is_empty(0, 1) and board.get(0, 2) == "wR"
 
-    events = arbiter.advance_time(MD)
+    events, _starts = arbiter.advance_time(MD)
     assert board.is_empty(0, 2) and board.get(0, 3) == "wR"
     assert len(events) == 1
     assert (events[0].origin, events[0].destination) == ((0, 0), (0, 3))
@@ -213,7 +213,7 @@ def test_pawn_double_step_stops_short_and_does_not_snap_back():
     arbiter.advance_time(MD)  # steps to the mid cell
     assert board.get(2, 0) == "wP" and board.is_empty(3, 0)
 
-    events = arbiter.advance_time(MD)  # G6->G5 blocked by friendly -> stop
+    events, _starts = arbiter.advance_time(MD)  # G6->G5 blocked by friendly -> stop
     assert board.get(2, 0) == "wP"     # stayed on the cell it reached
     assert board.is_empty(3, 0)        # NOT snapped back to source
     assert board.get(1, 0) == "wQ"     # friendly untouched
@@ -232,7 +232,7 @@ def test_pawn_straight_into_enemy_blocks_without_capturing():
     arbiter.start_move("wP", (3, 0), ((2, 0), (1, 0)), False)
 
     arbiter.advance_time(MD)   # -> mid cell
-    events = arbiter.advance_time(MD)  # final enemy, may_capture_final False
+    events, _starts = arbiter.advance_time(MD)  # final enemy, may_capture_final False
     assert board.get(2, 0) == "wP"   # stopped short
     assert board.get(1, 0) == "bP"   # enemy NOT captured
     assert events[0].captured is None
@@ -244,7 +244,7 @@ def test_pawn_straight_into_enemy_blocks_without_capturing():
 def test_blocked_at_first_step_leaves_no_event_and_no_cooldown():
     arbiter, board = make_arbiter([["wR", "wP", "."]])
     arbiter.start_move("wR", (0, 0), ((0, 1), (0, 2)), True)
-    events = arbiter.advance_time(2 * MD)
+    events, _starts = arbiter.advance_time(2 * MD)
 
     assert events == []                 # never advanced -> no event
     assert board.get(0, 0) == "wR"      # stays on source
@@ -262,7 +262,7 @@ def test_uncapturable_enemy_at_first_step_leaves_no_trace():
     arbiter, board = make_arbiter([["bP"], ["wP"]])
     # Single-cell straight step (final == first cell); pawns can't capture ahead.
     arbiter.start_move("wP", (1, 0), ((0, 0),), False)
-    events = arbiter.advance_time(MD)
+    events, _starts = arbiter.advance_time(MD)
 
     assert events == []                 # never advanced -> no event
     assert board.get(1, 0) == "wP"      # stays on source
@@ -276,7 +276,7 @@ def test_uncapturable_enemy_at_first_step_leaves_no_trace():
 def test_capture_at_final_cell():
     arbiter, board = make_arbiter([["wR", ".", "bK"]])
     arbiter.start_move("wR", (0, 0), ((0, 1), (0, 2)), True)
-    events = arbiter.advance_time(2 * MD)
+    events, _starts = arbiter.advance_time(2 * MD)
 
     assert board.get(0, 2) == "wR"
     assert board.is_empty(0, 0)
@@ -298,7 +298,7 @@ def test_crossing_move_alone_completes_unobstructed():
     arbiter.start_move("wQ", (1, 0), ((1, 1), (1, 2)), True)
     arbiter.advance_time(MD)
     assert board.get(1, 1) == "wQ"
-    events = arbiter.advance_time(MD)
+    events, _starts = arbiter.advance_time(MD)
     assert board.get(1, 2) == "wQ"
     assert events[0].destination == (1, 2)
 
@@ -350,7 +350,7 @@ def test_knight_is_atomic_and_takes_twice_move_duration():
     assert board.is_empty(0, 1)
     assert arbiter.has_active_motion() is True
 
-    events = arbiter.advance_time(MD)  # 2 * MD total -> lands atomically
+    events, _starts = arbiter.advance_time(MD)  # 2 * MD total -> lands atomically
     assert board.get(0, 1) == "wN"
     assert board.is_empty(2, 0)
     assert events[0].destination == (0, 1)
@@ -362,7 +362,7 @@ def test_jumper_on_final_cell_intercepts_and_credits_the_jumper():
     arbiter, board = make_arbiter([["wR", "bP", "."]])
     arbiter.start_move("wR", (0, 0), ((0, 1),), True)
     arbiter.start_jump("bP", (0, 1))
-    events = arbiter.advance_time(JD)
+    events, _starts = arbiter.advance_time(JD)
 
     assert board.get(0, 1) == "bP"     # target unchanged
     assert board.is_empty(0, 0)        # mover captured on its current cell
@@ -381,7 +381,7 @@ def test_jumper_on_intermediate_cell_is_only_a_blocker_not_an_interceptor():
     arbiter.start_jump("bP", (0, 2))  # intermediate, not the final cell
 
     arbiter.advance_time(MD)          # steps to (0,1)
-    events = arbiter.advance_time(MD)  # (0,2) holds an enemy jumper -> stop short
+    events, _starts = arbiter.advance_time(MD)  # (0,2) holds an enemy jumper -> stop short
 
     assert board.get(0, 1) == "wR"    # mover survives, stopped short
     assert board.get(0, 2) == "bP"    # jumper untouched (not captured)
@@ -395,7 +395,7 @@ def test_jumper_on_intermediate_cell_is_only_a_blocker_not_an_interceptor():
 def test_pawn_promotes_when_it_settles_on_the_last_rank():
     arbiter, board = make_arbiter([["."], ["wP"]], promotion_rule=PromoteOnTopRank())
     arbiter.start_move("wP", (1, 0), ((0, 0),), False)
-    events = arbiter.advance_time(MD)
+    events, _starts = arbiter.advance_time(MD)
     assert board.get(0, 0) == "wQ"
     assert events[0].piece == "wQ"
 
@@ -405,7 +405,7 @@ def test_pawn_blocked_short_of_last_rank_is_not_promoted():
     arbiter, board = make_arbiter([["wR"], ["."], ["wP"]], promotion_rule=PromoteOnTopRank())
     arbiter.start_move("wP", (2, 0), ((1, 0), (0, 0)), False)
     arbiter.advance_time(MD)          # -> row1
-    events = arbiter.advance_time(MD)  # row0 friendly blocks -> settle on row1
+    events, _starts = arbiter.advance_time(MD)  # row0 friendly blocks -> settle on row1
     assert board.get(1, 0) == "wP"    # NOT promoted (settled below the rank)
     assert events[0].piece == "wP"
 
@@ -416,7 +416,7 @@ def test_interception_never_promotes():
     arbiter, board = make_arbiter([["bN"], ["wP"]], promotion_rule=PromoteOnTopRank())
     arbiter.start_move("wP", (1, 0), ((0, 0),), False)  # heading to the top rank
     arbiter.start_jump("bN", (0, 0))
-    events = arbiter.advance_time(JD)
+    events, _starts = arbiter.advance_time(JD)
     assert board.get(0, 0) == "bN"    # jumper stays, no wQ ever placed
     assert board.is_empty(1, 0)       # pawn captured off its current cell
     assert events[0].piece == "bN"
@@ -459,3 +459,43 @@ def test_motion_view_reports_half_progress_of_the_current_substep():
     motion = arbiter.active_motions()[0]
     assert (motion.start, motion.end) == ((0, 1), (0, 2))
     assert motion.progress == 0.5
+
+
+# --- MotionStarted: event-driven timing for client-side interpolation -------
+
+def test_start_move_returns_the_first_steps_motion_started():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    started = arbiter.start_move("wR", (0, 0), ((0, 1), (0, 2)), True)
+    assert (started.piece, started.start, started.end) == ("wR", (0, 0), (0, 1))
+    assert started.start_ms == 0
+    assert started.duration_ms == MD
+
+
+def test_each_continued_step_reports_its_own_motion_started():
+    arbiter, _ = make_arbiter([["wR", ".", ".", "."]])
+    arbiter.start_move("wR", (0, 0), ((0, 1), (0, 2), (0, 3)), True)
+
+    _arrivals, starts = arbiter.advance_time(MD)  # step 1 settles -> step 2 begins
+    assert len(starts) == 1
+    started = starts[0]
+    assert (started.start, started.end) == ((0, 1), (0, 2))
+    assert started.start_ms == MD           # exactly when step 1 arrived
+    assert started.duration_ms == MD
+
+    _arrivals, starts = arbiter.advance_time(MD)  # step 2 settles -> step 3 begins
+    assert (starts[0].start, starts[0].end) == ((0, 2), (0, 3))
+    assert starts[0].start_ms == 2 * MD
+
+
+def test_a_step_that_settles_the_move_reports_no_further_start():
+    arbiter, _ = make_arbiter([["wR", ".", "."]])
+    arbiter.start_move("wR", (0, 0), ((0, 1),), True)
+    _arrivals, starts = arbiter.advance_time(MD)  # the only step; nothing follows
+    assert starts == []
+
+
+def test_a_step_blocked_before_ever_moving_reports_no_start():
+    arbiter, _ = make_arbiter([["wR", "wP", "."]])
+    arbiter.start_move("wR", (0, 0), ((0, 1), (0, 2)), True)
+    _arrivals, starts = arbiter.advance_time(2 * MD)
+    assert starts == []

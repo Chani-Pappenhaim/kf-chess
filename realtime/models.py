@@ -17,6 +17,7 @@ class Move:
     index: int               # cells of `path` already committed; 0 = still on source
     may_capture_final: bool  # may it take an enemy on the last cell?
     arrival: int             # clock time at which it reaches `next_cell`
+    step_started_at: int = 0  # clock time the *current* step began (see MotionStarted)
 
     @property
     def current(self):
@@ -64,3 +65,17 @@ class MotionView:
     start: tuple      # the cell it is stepping off
     end: tuple        # the next cell, not the far destination
     progress: float   # 0..1 through this one step
+
+
+@dataclass(frozen=True)
+class MotionStarted:
+    """A step just began - the realtime-layer twin of ArrivalEvent, for a
+    step's start rather than a move's end. Translated into a wire event
+    (game.events.MoveStepStarted) by GameEngine, same as ArrivalEvent becomes
+    MoveCompleted; this layer knows nothing of the event bus itself."""
+
+    piece: str
+    start: tuple
+    end: tuple
+    start_ms: int
+    duration_ms: int

@@ -29,8 +29,11 @@ def subscribe_broadcast(bus, send):
         bus.subscribe(event_type, relay)
 
 
-def broadcast_state(engine, players, ratings, viewers, countdown, send, move_history_limit=None):
-    """Send the whole state as it stands right now.
+def encode_state(engine, players, ratings, viewers, countdown, move_history_limit=None):
+    """The wire-ready state dict, without sending it - split out from
+    `broadcast_state` so `server/room.py` can compare one tick's payload
+    against the last one it actually sent (dirty-flag check) before paying
+    for a broadcast.
 
     Player names, ratings, who is watching, and any resign countdown are the
     server's, not the engine's, so they are folded into the model here at the
@@ -44,4 +47,14 @@ def broadcast_state(engine, players, ratings, viewers, countdown, send, move_his
         engine.render_model(),
         players=players, ratings=ratings, viewers=viewers, countdown=countdown,
     )
-    send(encode(StateUpdate(encode_model(model, move_history_limit))))
+    return encode_model(model, move_history_limit)
+
+
+def broadcast_state(engine, players, ratings, viewers, countdown, send, move_history_limit=None):
+    """Send the whole state as it stands right now, unconditionally - what a
+    just-seated or just-departed member needs immediately, regardless of the
+    dirty-flag/throttle `server/room.py` applies to its routine per-tick
+    broadcast."""
+    send(encode(StateUpdate(
+        encode_state(engine, players, ratings, viewers, countdown, move_history_limit)
+    )))

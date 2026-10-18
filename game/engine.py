@@ -2,6 +2,7 @@ from game.models import MoveResult
 from game.events import (
     GameStarted,
     MoveCompleted,
+    MoveStepStarted,
     PieceCaptured,
     JumpStarted,
     GameEnded,
@@ -115,9 +116,10 @@ class GameEngine:
         # to the arbiter. The arbiter walks the plan cell by cell and never
         # consults the rules layer itself - all piece knowledge stays here.
         plan = self._rule_engine.build_plan(self._board, start, end)
-        self._arbiter.start_move(
+        started = self._arbiter.start_move(
             self._board.get(*start), start, plan.path, plan.may_capture_final
         )
+        self._publish_start(started)
         return MoveResult(True, Reason.OK)
 
     def request_jump(self, cell):
@@ -132,11 +134,14 @@ class GameEngine:
 
         piece = self._board.get(*cell)
         self._arbiter.start_jump(piece, cell)
-        self._bus.publish(JumpStarted(piece, cell, self._arbiter.clock))
+        self._bus.publish(JumpStarted(piece, cell, self._arbiter.clock, self._config.JUMP_DURATION))
         return MoveResult(True, Reason.OK)
 
     def wait(self, dt):
-        self._apply_events(self._arbiter.advance_time(dt))
+        arrivals, starts = self._arbiter.advance_time(dt)
+        self._apply_events(arrivals)
+        for started in starts:
+            self._publish_start(started)
 
     def snapshot(self):
         return GameSnapshot.from_board(self._board, self._game_over)
@@ -198,6 +203,12 @@ class GameEngine:
         return renderer.render(self.snapshot())
 
     # -- internal helpers -------------------------------------------------
+
+    def _publish_start(self, started):
+        self._bus.publish(MoveStepStarted(
+            piece=started.piece, start=started.start, end=started.end,
+            start_ms=started.start_ms, duration_ms=started.duration_ms,
+        ))
 
     def _apply_events(self, arrivals):
         """Publish what the arbiter reports, as game events.

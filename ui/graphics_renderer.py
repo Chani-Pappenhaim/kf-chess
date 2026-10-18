@@ -23,7 +23,7 @@ _MOVE_HINT_RATIO = 0.3              # move-hint dot size, as a fraction of a cel
 
 
 class GraphicsRenderer:
-    def __init__(self, sprite_library, cell_size, origin=(0, 0)):
+    def __init__(self, sprite_library, cell_size, origin=(0, 0), motion=None):
         self._sprites = sprite_library
         self._cell = cell_size
         self._origin_x, self._origin_y = origin
@@ -33,6 +33,9 @@ class GraphicsRenderer:
         self._move_hint = solid(dot, dot, _MOVE_HINT_COLOR)
         self._capture_hint = solid(cell_size, cell_size, _CAPTURE_HINT_COLOR)
         self._dot_offset = (cell_size - dot) // 2
+        # None: draw exactly the progress the model carries (e.g. a snapshot
+        # render, or a test with no bus of its own) - see MotionInterpolator.
+        self._motion = motion
 
     def render(self, model, background, clock_ms=0, selected=None, targets=()):
         """Draw the model over a copy of `background`, returning a new canvas.
@@ -97,7 +100,7 @@ class GraphicsRenderer:
         if not frozen and piece.state == "jump":
             # Lift the piece along the hop so the jump reads as a jump; clamp to
             # the top edge so a piece on the back rank never draws off-canvas.
-            y = max(0, y - self._hop_arc(piece.progress))
+            y = max(0, y - self._hop_arc(self._progress_of(piece)))
         return x, y
 
     def _hop_arc(self, progress):
@@ -105,13 +108,26 @@ class GraphicsRenderer:
         and landing and peaks at `_hop_height` mid-flight (4p(1-p))."""
         return int(self._hop_height * 4 * progress * (1 - progress))
 
+    def _progress_of(self, piece):
+        """How far through its current step/jump `piece` is - computed
+        locally every frame from a MotionInterpolator when one is wired in,
+        so motion is smooth between StateUpdates instead of only updating
+        whenever one happens to arrive (see server/room.py's throttled
+        broadcast). Falls back to the model's own `progress` field otherwise."""
+        if self._motion is None:
+            return piece.progress
+        return self._motion.progress(piece.cell, piece.progress)
+
     def _current_cell(self, piece):
         """The (possibly fractional) cell to draw at: the piece's own cell when
         still, or a point interpolated towards `target` while a step is due."""
-        if piece.target is None or piece.progress <= 0:
+        if piece.target is None:
+            return piece.cell
+        progress = self._progress_of(piece)
+        if progress <= 0:
             return piece.cell
         (start_r, start_c), (end_r, end_c) = piece.cell, piece.target
         return (
-            start_r + (end_r - start_r) * piece.progress,
-            start_c + (end_c - start_c) * piece.progress,
+            start_r + (end_r - start_r) * progress,
+            start_c + (end_c - start_c) * progress,
         )

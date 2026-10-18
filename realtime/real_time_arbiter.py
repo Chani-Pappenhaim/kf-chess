@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from realtime.models import Move, Jump, MotionView
+from realtime.models import Move, Jump, MotionStarted, MotionView
 
 
 @dataclass(frozen=True)
@@ -95,13 +95,16 @@ class RealTimeArbiter:
 
         Nothing moves yet: the piece stays on ``source`` until the first step
         falls due. ``may_capture_final`` false means it stops short of an enemy
-        on the last cell instead of taking it.
+        on the last cell instead of taking it. Returns the MotionStarted for
+        this first step - the caller (GameEngine.request_move) publishes it,
+        same as it already does for a jump's own JumpStarted.
         """
         path = tuple(path)
         arrival = self._clock + self._move_total(source, path[0])
         self._active_moves.append(
-            Move(piece, source, path, 0, may_capture_final, arrival)
+            Move(piece, source, path, 0, may_capture_final, arrival, step_started_at=self._clock)
         )
+        return MotionStarted(piece, source, path[0], self._clock, arrival - self._clock)
 
     def start_jump(self, piece, cell):
         self._active_jumps.append(Jump(piece, cell, self._clock + self._config.JUMP_DURATION))
@@ -117,8 +120,15 @@ class RealTimeArbiter:
         Always takes the earliest due step next, tie-broken by who started
         first, rather than draining one move before the next. Two pieces racing
         for the same cell therefore resolve the same way every run.
+
+        Returns (arrivals, starts): ArrivalEvents for whatever settled or was
+        captured this call, and MotionStarted for every new step that began
+        (a move continuing onto its next cell) - the two halves GameEngine
+        publishes as MoveCompleted/PieceCaptured/GameEnded and
+        MoveStepStarted respectively.
         """
-        events = []
+        arrivals = []
+        starts = []
         while True:
             due = [
                 (order, move)
@@ -130,14 +140,18 @@ class RealTimeArbiter:
             order, move = min(due, key=lambda pair: (pair[1].arrival, pair[0]))
             next_move, event = self._step_move(move)
             if event is not None:
-                events.append(event)
+                arrivals.append(event)
             if next_move is None:
                 self._active_moves.pop(order)
             else:
                 self._active_moves[order] = next_move
+                starts.append(MotionStarted(
+                    next_move.piece, next_move.current, next_move.next_cell,
+                    next_move.step_started_at, next_move.arrival - next_move.step_started_at,
+                ))
         self._resolve_jumps()
         self._prune_cooldowns()
-        return events
+        return arrivals, starts
 
     # -- internal helpers -------------------------------------------------
 
@@ -207,7 +221,9 @@ class RealTimeArbiter:
         new_current = move.path[new_index - 1]
         next_cell = move.path[new_index]
         arrival = move.arrival + self._move_total(new_current, next_cell)
-        return replace(move, index=new_index, arrival=arrival)
+        # This step's own arrival is exactly when the new one begins - steps
+        # run back to back with no gap.
+        return replace(move, index=new_index, arrival=arrival, step_started_at=move.arrival)
 
     def _settle(self, move, cell, captured):
         """End the move on ``cell``: apply promotion, start the long rest, and

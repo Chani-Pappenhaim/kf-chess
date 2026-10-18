@@ -53,6 +53,11 @@ def test_moving_piece_is_interpolated_between_cells():
     assert _render(100, 100, piece) == [(100, 0)]
 
 
+def test_a_move_at_zero_progress_draws_on_its_own_cell_not_the_target():
+    piece = RenderPiece("wP", (0, 0), state="move", target=(0, 2), progress=0.0)
+    assert _render(100, 100, piece) == [(0, 0)]
+
+
 def test_jumping_piece_is_lifted_along_the_hop():
     # cell 100, sprite 60 -> idle sits at y = 320 for row 3. Mid-hop (progress
     # 0.5) lifts it by the full hop height (0.5 * 100 = 50) -> y = 270.
@@ -152,3 +157,45 @@ def test_capture_hint_tints_an_occupied_target():
     canvas = renderer.render(model, _FakeBackground(8 * cell), targets=((2, 3),))
     # occupied target -> red tint over the whole cell (red channel, BGRA index 2).
     assert canvas.img[210, 310][2] > 0
+
+
+# -- motion interpolation: a wired-in MotionInterpolator overrides progress --
+
+class _FakeMotion:
+    """Stands in for MotionInterpolator: reports a fixed progress per cell,
+    or falls back to whatever the caller passed as the default."""
+
+    def __init__(self, progress_by_cell):
+        self._progress_by_cell = progress_by_cell
+
+    def progress(self, cell, default):
+        return self._progress_by_cell.get(cell, default)
+
+
+def test_a_wired_motion_interpolator_overrides_the_models_own_move_progress():
+    # The model says progress 0.0 (not moved yet); the interpolator says 0.5 -
+    # the interpolator wins, so the piece is drawn already halfway there.
+    piece = RenderPiece("wP", (0, 0), state="move", target=(0, 2), progress=0.0)
+    frame = _FakeFrame(100)
+    renderer = GraphicsRenderer(_FakeLibrary(frame), 100, motion=_FakeMotion({(0, 0): 0.5}))
+    model = RenderModel(pieces=(piece,), width=8, height=8)
+    renderer.render(model, _FakeBackground(800))
+    assert frame.drawn_at == [(100, 0)]
+
+
+def test_a_cell_the_interpolator_has_nothing_for_falls_back_to_model_progress():
+    piece = RenderPiece("wP", (0, 0), state="move", target=(0, 2), progress=0.5)
+    frame = _FakeFrame(100)
+    renderer = GraphicsRenderer(_FakeLibrary(frame), 100, motion=_FakeMotion({}))
+    model = RenderModel(pieces=(piece,), width=8, height=8)
+    renderer.render(model, _FakeBackground(800))
+    assert frame.drawn_at == [(100, 0)]  # the model's own 0.5, untouched
+
+
+def test_a_wired_motion_interpolator_overrides_jump_progress_too():
+    frame = _FakeFrame(60)
+    renderer = GraphicsRenderer(_FakeLibrary(frame), 100, motion=_FakeMotion({(3, 3): 0.5}))
+    piece = RenderPiece("wP", (3, 3), state="jump", progress=0.0)  # model says grounded
+    model = RenderModel(pieces=(piece,), width=8, height=8)
+    renderer.render(model, _FakeBackground(800))
+    assert frame.drawn_at == [(320, 270)]  # lifted, per the interpolator's 0.5

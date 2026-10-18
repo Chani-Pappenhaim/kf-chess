@@ -51,11 +51,31 @@ class PieceCaptured:
 @dataclass(frozen=True)
 class JumpStarted:
     """A piece left the ground. Published the instant the command is accepted,
-    since a jump has no arrival to wait for."""
+    since a jump has no arrival to wait for. `duration_ms` lets a client
+    animate the whole jump locally (see MoveStepStarted) instead of only
+    trusting the progress fraction the next StateUpdate happens to carry."""
 
     piece: str
     cell: tuple
     at_ms: int
+    duration_ms: int = 0
+
+
+@dataclass(frozen=True)
+class MoveStepStarted:
+    """A piece began stepping from `start` to `end`, landing at `start_ms +
+    duration_ms`. Published once per cell of a slide - a rook crossing three
+    squares raises three of these, one as each step begins - so a client can
+    animate the whole path itself instead of only trusting whatever progress
+    fraction the next StateUpdate happens to carry. MoveCompleted still
+    marks where a move actually settled; this only ever describes motion
+    already known to be legal and already under way."""
+
+    piece: str
+    start: tuple
+    end: tuple
+    start_ms: int
+    duration_ms: int
 
 
 @dataclass(frozen=True)

@@ -258,3 +258,63 @@ def test_no_snapshots_configured_is_a_quiet_no_op():
     r.join(FakeSession("dana"))
     r.join(FakeSession("yossi"))
     r.tick(settings.ROOM_SNAPSHOT_INTERVAL_MS)  # must not raise
+
+
+# -- throttled, dirty-flagged broadcasting (server/room.py::tick) ------------
+
+class FakeMovingEngine(FakeEngine):
+    """A FakeEngine whose render_model changes on its second call onward, so
+    a test can force a genuine dirty-check difference between two ticks."""
+
+    def __init__(self):
+        super().__init__()
+        self.calls = 0
+
+    def render_model(self):
+        self.calls += 1
+        cell = (0, 0) if self.calls < 2 else (0, 1)
+        return RenderModel(pieces=(RenderPiece("wK", cell),), width=8, height=8)
+
+
+def test_a_tick_below_the_throttle_interval_sends_nothing():
+    r, _ = room()
+    white = FakeSession("dana")
+    r.join(white)
+    white.sent.clear()
+    r.tick(settings.STATE_BROADCAST_MS - 1)
+    assert white.sent == []
+
+
+def test_an_unchanged_state_is_not_rebroadcast_even_past_the_throttle():
+    # join() already sent the current (idle) state; nothing moves afterward,
+    # so the very next throttled tick must stay silent.
+    r, _ = room()
+    white = FakeSession("dana")
+    r.join(white)
+    white.sent.clear()
+    r.tick(settings.STATE_BROADCAST_MS)
+    assert white.sent == []
+
+
+def test_a_changed_state_is_broadcast_once_the_throttle_interval_passes():
+    engine = FakeMovingEngine()
+    r = Room("7", engine, PlayerRegistry(settings.COLORS), 8, settings)
+    white = FakeSession("dana")
+    r.join(white)                              # sends cell (0, 0)
+    white.sent.clear()
+    r.tick(settings.STATE_BROADCAST_MS)        # render_model now differs -> sends
+    assert len(white.sent) == 1
+    assert last_state(white).pieces[0].cell == (0, 1)
+
+
+def test_the_clock_alone_changing_does_not_count_as_dirty():
+    # FakeEngine.render_model() never changes its own fields, but the real
+    # engine's `clock` always advances - the dirty check must ignore it, or
+    # every single tick would count as "changed" and defeat the throttle.
+    r, _ = room()
+    white = FakeSession("dana")
+    r.join(white)
+    white.sent.clear()
+    r.tick(settings.STATE_BROADCAST_MS)
+    r.tick(settings.STATE_BROADCAST_MS)
+    assert white.sent == []

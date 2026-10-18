@@ -6,6 +6,7 @@ from game.events import (
     GameStarted,
     JumpStarted,
     MoveCompleted,
+    MoveStepStarted,
     PieceCaptured,
 )
 from protocol.events import EVENT_TYPES, decode_event
@@ -16,8 +17,9 @@ from server.broadcast import broadcast_state, subscribe_broadcast
 ONE_OF_EACH = (
     GameStarted(at_ms=0),
     MoveCompleted("wR", (5, 0), (5, 2), None, 1000),
+    MoveStepStarted("wR", (5, 0), (5, 1), 1000, 300),
     PieceCaptured("wR", "bP", (5, 2), 1000),
-    JumpStarted("wN", (5, 5), 1200),
+    JumpStarted("wN", (5, 5), 1200, 300),
     GameEnded("w", 1400),
 )
 

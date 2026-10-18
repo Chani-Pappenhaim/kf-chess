@@ -15,6 +15,7 @@ from ui.game_loop import GameLoop
 from ui.graphics_renderer import GraphicsRenderer
 from ui.hud import Hud
 from ui.input_source import InputTranslator
+from ui.motion_interpolation import MotionInterpolator
 
 _BACKGROUND_COLOR = (238, 238, 238, 255)  # light window background around the board
 
@@ -59,6 +60,7 @@ def build_loop(window, gateway, controller, bus, config,
         AssetLoader(config).load_sprite_library(),
         config.CELL_SIZE,
         origin=board_origin(config),
+        motion=MotionInterpolator(bus),
     )
     return GameLoop(
         window=window,

@@ -12,13 +12,14 @@ from __future__ import annotations
 from game.events import (
     GameStarted,
     MoveCompleted,
+    MoveStepStarted,
     PieceCaptured,
     JumpStarted,
     GameEnded,
 )
 from protocol.records import by_name, decode_record, encode_record
 
-EVENT_TYPES = (GameStarted, MoveCompleted, PieceCaptured, JumpStarted, GameEnded)
+EVENT_TYPES = (GameStarted, MoveCompleted, MoveStepStarted, PieceCaptured, JumpStarted, GameEnded)
 
 _ALLOWED = by_name(EVENT_TYPES)
 

@@ -179,6 +179,15 @@ GAME_SERVERS = os.environ.get("KF_GAME_SERVERS", "local=ws://localhost:8765")
 # draw what they are sent and never advance anything themselves.
 SERVER_TICK_MS = 33
 
+# How often a room even considers sending StateUpdate (server/room.py) -
+# decoupled from SERVER_TICK_MS on purpose: the simulation still advances
+# every 33ms for timing precision, but the network send rate is the thing
+# that actually costs bandwidth, and 10Hz is plenty once clients animate
+# motion themselves between updates (see game/events.py's MoveStepStarted).
+# Combined with the dirty-flag check below, an idle room (nothing moving)
+# sends nothing at all instead of the same unchanged snapshot 30x/second.
+STATE_BROADCAST_MS = 100
+
 MS_PER_SECOND = 1000  # the game counts in milliseconds, asyncio.sleep in seconds
 
 # How many trailing move records a StateUpdate carries. Without a cap this
