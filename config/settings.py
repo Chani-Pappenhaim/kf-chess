@@ -279,12 +279,18 @@ DISCONNECT_GRACE_MS = 20000
 GAME_END_FORFEIT = "forfeit"
 FORFEIT_BANNER_TEXT = "{winner} WINS - OPPONENT LEFT"
 
-# Home screen (shown after login) and its two buttons.
+# Home screen (shown after login) and its three buttons, and the colour screen
+# the Computer button leads to. Both are menus of the same buttons
+# (client/home.py), stacked and centred.
 PLAY_BUTTON_TEXT = "Play"
 ROOM_BUTTON_TEXT = "Room"
+COMPUTER_BUTTON_TEXT = "Computer"
+WHITE_BUTTON_TEXT = "White"
+BLACK_BUTTON_TEXT = "Black"
+RANDOM_COLOR_BUTTON_TEXT = "Random"
 HOME_BUTTON_WIDTH = 220
 HOME_BUTTON_HEIGHT = 72
-HOME_BUTTON_GAP = 30                       # vertical space between the two buttons
+HOME_BUTTON_GAP = 30                       # vertical space between two buttons
 HOME_BUTTON_COLOR = (210, 210, 210, 255)   # button fill (BGRA)
 
 # The computer opponent (bot/). It sits in a room's seat like a player, under

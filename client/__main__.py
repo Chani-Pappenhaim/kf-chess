@@ -5,15 +5,16 @@ rules, no clock. It sends what the player does and draws what it is told.
 
 Login is asked in the shell (username, then a masked password) and sent over
 HTTP to the API Gateway, which answers with a token - the game socket never
-sees the password. Then a home screen offers two ways into a game - Play for a
-quick match, or Room to create or join one by id - and once in a room the same
+sees the password. Then a home screen offers three ways into a game - Play for
+a quick match, Room to create or join one by id, or Computer to play the
+computer in the colour picked on the next screen - and once in a room the same
 window play.py uses draws the game, unaware it is remote. Everything above the
 gateway is the same code the local game runs.
 """
 from __future__ import annotations
 
 from client.gateway import NetworkGateway
-from client.home import HomeScreen, run_home
+from client.home import color_menu, home_menu, requested_color, run_menu
 from client.identity import Identity
 from client.inbox import Inbox
 from client.login import http_login
@@ -28,7 +29,7 @@ from graphics.window import Window
 from interaction.board_mapper import BoardMapper
 from interaction.controller import Controller
 from logs.activity_log import file_log, silent_log
-from protocol.messages import Connect, CreateRoom, JoinRoom, SeekGame, encode
+from protocol.messages import Connect, CreateRoom, JoinRoom, PlayComputer, SeekGame, encode
 from ui.composition import board_origin, build_loop
 
 
@@ -116,17 +117,23 @@ def _await_login(window, identity, config):  # pragma: no cover
 
 
 def _pick_and_enter(window, send, identity, config):  # pragma: no cover
-    """The home screen: choose Play or Room until one puts us in a room. Returns
-    True once in a room, False if the window is closed or the connection drops."""
-    home = HomeScreen(config)
+    """The home screen: choose Play, Room or Computer until one puts us in a
+    room. Returns True once in a room, False if the window is closed or the
+    connection drops."""
+    home, colors = home_menu(config), color_menu(config)
     while True:
         identity.retry()
-        choice = run_home(window, home)
+        choice = run_menu(window, home)
         if choice is None:
             return False
         if choice == "play":
             identity.seeking()
             send(encode(SeekGame()))
+        elif choice == "computer":
+            color = run_menu(window, colors)
+            if color is None:
+                return False
+            send(encode(PlayComputer(requested_color(color))))
         elif not _ask_room(send, config):
             continue  # dialog cancelled - back to the home screen
         if _await_room(window, identity, config):
